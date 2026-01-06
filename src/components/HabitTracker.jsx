@@ -123,13 +123,20 @@ const HabitTracker = () => {
         setShowPasswordReset(true);
       }
 
-      // Fetch habits if user exists
+      // Fetch habits if user exists (with timeout to prevent hanging)
       if (session?.user) {
         try {
-          const data = await fetchHabits(session.user.id);
+          const timeoutPromise = new Promise((_, reject) =>
+            setTimeout(() => reject(new Error('Fetch timeout')), 10000)
+          );
+          const data = await Promise.race([
+            fetchHabits(session.user.id),
+            timeoutPromise
+          ]);
           setHabits(data);
         } catch (err) {
           console.error('Error fetching habits:', err);
+          setFetchError(err.message || 'Failed to load habits');
         }
       } else {
         setHabits([]);
