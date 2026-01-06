@@ -4,21 +4,9 @@ import { createClient } from '@supabase/supabase-js'
 const supabaseUrl = import.meta.env.VITE_SUPABASE_URL || import.meta.env.SUPABASE_URL
 const supabaseAnonKey = import.meta.env.VITE_SUPABASE_ANON_KEY || import.meta.env.SUPABASE_ANON_KEY
 
-// Debug: Log what we're getting
-if (typeof window !== 'undefined') {
-  const debugInfo = {
-    url: supabaseUrl ? `${supabaseUrl.substring(0, 30)}...` : '❌ MISSING',
-    key: supabaseAnonKey ? `${supabaseAnonKey.substring(0, 30)}...` : '❌ MISSING',
-    hasUrl: !!supabaseUrl,
-    hasKey: !!supabaseAnonKey,
-    allViteVars: Object.keys(import.meta.env).filter(k => k.startsWith('VITE_')),
-    mode: import.meta.env.MODE,
-    dev: import.meta.env.DEV,
-    prod: import.meta.env.PROD
-  }
-  console.log('🔍 Supabase config check:', debugInfo)
-  console.log('Full URL:', supabaseUrl)
-  console.log('Full Key (first 50 chars):', supabaseAnonKey ? supabaseAnonKey.substring(0, 50) : 'MISSING')
+// Debug logging (remove in production if desired)
+if (typeof window !== 'undefined' && import.meta.env.DEV) {
+  console.log('✅ Supabase connected:', supabaseUrl ? 'Yes' : 'No')
 }
 
 if (!supabaseUrl || !supabaseAnonKey) {
