@@ -21,6 +21,16 @@ const HabitTracker = () => {
   const [bootSequence, setBootSequence] = useState(true);
   const [bootLine, setBootLine] = useState(0);
   const [syncing, setSyncing] = useState(false);
+  const [confirmingDeleteId, setConfirmingDeleteId] = useState(null);
+  const [newHabitGoal, setNewHabitGoal] = useState(1);
+  const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
+
+  // Handle responsive layout
+  useEffect(() => {
+    const handleResize = () => setIsMobile(window.innerWidth < 600);
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
 
   const bootMessages = [
     '> Habito v2.5.0 initializing...',
@@ -45,6 +55,7 @@ const HabitTracker = () => {
       return habitsData.map(h => ({
         ...h,
         completed_today: false,
+        completions_today: 0,
         history: [...(h.history || [0,0,0,0,0,0,0]).slice(1), h.completed_today ? 1 : 0],
         streak: h.completed_today ? h.streak : 0 // Reset streak if didn't complete yesterday
       }));
@@ -569,22 +580,33 @@ const HabitTracker = () => {
     }
   };
 
-  const toggleHabit = async (id) => {
+  const incrementHabit = async (id) => {
     const habit = habits.find(h => h.id === id);
     if (!habit) return;
 
-    const newCompleted = !habit.completed_today;
-    const newStreak = newCompleted ? habit.streak + 1 : Math.max(0, habit.streak - 1);
+    const dailyGoal = habit.daily_goal || 1;
+    const currentCompletions = habit.completions_today || 0;
+    const newCompletions = (currentCompletions + 1) % (dailyGoal + 1);
+    const wasCompleted = habit.completed_today;
+    const nowCompleted = newCompletions >= dailyGoal;
+
+    // Adjust streak based on completion status change
+    let newStreak = habit.streak;
+    if (!wasCompleted && nowCompleted) {
+      newStreak = habit.streak + 1;
+    } else if (wasCompleted && !nowCompleted) {
+      newStreak = Math.max(0, habit.streak - 1);
+    }
 
     // Optimistic update
-    setHabits(habits.map(h => 
-      h.id === id ? { ...h, completed_today: newCompleted, streak: newStreak } : h
+    setHabits(habits.map(h =>
+      h.id === id ? { ...h, completions_today: newCompletions, completed_today: nowCompleted, streak: newStreak } : h
     ));
 
     setSyncing(true);
     const { error } = await supabase
       .from('habits')
-      .update({ completed_today: newCompleted, streak: newStreak })
+      .update({ completions_today: newCompletions, completed_today: nowCompleted, streak: newStreak })
       .eq('id', id);
 
     if (error) {
@@ -604,6 +626,8 @@ const HabitTracker = () => {
       icon: icons[habits.length % icons.length],
       streak: 0,
       completed_today: false,
+      completions_today: 0,
+      daily_goal: newHabitGoal,
       history: [0, 0, 0, 0, 0, 0, 0]
     };
 
@@ -621,6 +645,7 @@ const HabitTracker = () => {
     }
     
     setNewHabitName('');
+    setNewHabitGoal(1);
     setShowAddModal(false);
     setSyncing(false);
   };
@@ -646,7 +671,7 @@ const HabitTracker = () => {
   const generateProgressBar = (percent, width = 20) => {
     const filled = Math.round((percent / 100) * width);
     const empty = width - filled;
-    return `[${'█'.repeat(filled)}${'░'.repeat(empty)}]`;
+    return `${'█'.repeat(filled)}${'░'.repeat(empty)}`;
   };
 
   if (bootSequence) {
@@ -948,7 +973,7 @@ const HabitTracker = () => {
       backgroundColor: '#0a0a0a',
       fontFamily: '"IBM Plex Mono", "Fira Code", "SF Mono", monospace',
       color: '#c0c0c0',
-      padding: '20px',
+      padding: isMobile ? '12px' : '20px',
       position: 'relative',
       overflow: 'hidden'
     }}>
@@ -979,15 +1004,16 @@ const HabitTracker = () => {
       <div style={{ maxWidth: '700px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
         
         {/* Header */}
-        <div style={{ marginBottom: '30px' }}>
-          <div style={{ display: 'inline-flex', alignItems: 'flex-end', marginBottom: '20px' }}>
-            <pre style={{
-              color: '#00ff41',
-              fontSize: '10px',
-              lineHeight: '1.2',
-              margin: 0,
-              textShadow: '0 0 10px #00ff41'
-            }}>
+        <div style={{ marginBottom: isMobile ? '20px' : '30px' }}>
+          <div style={{ display: 'inline-flex', alignItems: 'flex-end', marginBottom: isMobile ? '12px' : '20px' }}>
+            <>
+              <pre style={{
+                color: '#00ff41',
+                fontSize: isMobile ? '5px' : '10px',
+                lineHeight: '1.2',
+                margin: 0,
+                textShadow: '0 0 10px #00ff41'
+              }}>
 {`
  ██╗  ██╗ █████╗ ██████╗ ██╗████████╗ ██████╗
  ██║  ██║██╔══██╗██╔══██╗██║╚══██╔══╝██╔═══██╗
@@ -995,21 +1021,28 @@ const HabitTracker = () => {
  ██╔══██║██╔══██║██╔══██╗██║   ██║   ██║   ██║
  ██║  ██║██║  ██║██████╔╝██║   ██║   ╚██████╔╝
  ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝    ╚═════╝`}
-            </pre>
-            <span style={{ color: '#666', fontSize: '12px', marginLeft: '2px' }}>.space</span>
+              </pre>
+              <span style={{ color: '#666', fontSize: isMobile ? '8px' : '12px', marginLeft: '2px' }}>.space</span>
+            </>
           </div>
 
-          <div style={{ 
+          <div style={{
             borderTop: '1px solid #333',
             borderBottom: '1px solid #333',
-            padding: '12px 0',
+            padding: isMobile ? '10px 0' : '12px 0',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            fontSize: '12px'
+            fontSize: isMobile ? '10px' : '12px',
+            flexWrap: isMobile ? 'wrap' : 'nowrap',
+            gap: isMobile ? '8px' : '0'
           }}>
             <span style={{ color: '#666' }}>
-              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase()}
+              {new Date().toLocaleDateString('en-US', {
+                weekday: isMobile ? 'short' : 'long',
+                month: 'short',
+                day: 'numeric'
+              }).toUpperCase()}
             </span>
             <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
               {syncing && (
@@ -1077,53 +1110,56 @@ const HabitTracker = () => {
         {/* Stats Panel */}
         <div style={{
           border: '1px solid #333',
-          marginBottom: '24px',
+          marginBottom: isMobile ? '16px' : '24px',
           backgroundColor: '#0d0d0d'
         }}>
           <div style={{
             borderBottom: '1px solid #333',
             padding: '8px 12px',
-            fontSize: '11px',
+            fontSize: isMobile ? '10px' : '11px',
             color: '#666',
             display: 'flex',
             justifyContent: 'space-between'
           }}>
-            <span>┌─ DAILY PROGRESS ─┐</span>
+            <span>{isMobile ? 'PROGRESS' : '┌─ DAILY PROGRESS ─┐'}</span>
             <span>{completedCount}/{habits.length} COMPLETE</span>
           </div>
-          
-          <div style={{ padding: '16px 12px' }}>
-            <div style={{ 
-              display: 'flex', 
-              alignItems: 'center', 
-              gap: '12px',
+
+          <div style={{ padding: isMobile ? '12px' : '16px 12px' }}>
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: isMobile ? '8px' : '12px',
               marginBottom: '12px'
             }}>
-              <span style={{ 
-                fontSize: '28px', 
+              <span style={{
+                fontSize: isMobile ? '22px' : '28px',
                 fontWeight: 'bold',
                 color: completionPercent === 100 ? '#00ff41' : '#fff',
                 textShadow: completionPercent === 100 ? '0 0 15px #00ff41' : 'none',
-                minWidth: '70px'
+                minWidth: isMobile ? '55px' : '70px'
               }}>
                 {completionPercent}%
               </span>
-              <span style={{ 
+              <span style={{
+                flex: 1,
                 fontFamily: 'monospace',
-                fontSize: '14px',
+                fontSize: isMobile ? '12px' : '14px',
                 color: completionPercent === 100 ? '#00ff41' : '#888',
-                letterSpacing: '1px'
+                letterSpacing: '0px',
+                whiteSpace: 'nowrap',
+                overflow: 'hidden'
               }}>
-                {generateProgressBar(completionPercent, 24)}
+                {generateProgressBar(completionPercent, 200)}
               </span>
             </div>
-            
+
             {completionPercent === 100 && (
               <div style={{
                 color: '#00ff41',
-                fontSize: '11px',
+                fontSize: isMobile ? '10px' : '11px',
                 animation: 'pulse 2s infinite',
-                letterSpacing: '2px'
+                letterSpacing: isMobile ? '1px' : '2px'
               }}>
                 ★ ALL HABITS COMPLETE ★
               </div>
@@ -1136,7 +1172,7 @@ const HabitTracker = () => {
           display: 'flex',
           gap: '4px',
           marginBottom: '16px',
-          fontSize: '11px'
+          fontSize: isMobile ? '10px' : '11px'
         }}>
           {['today', 'week', 'stats'].map(view => (
             <button
@@ -1147,7 +1183,7 @@ const HabitTracker = () => {
                 border: '1px solid #333',
                 borderBottom: selectedView === view ? '1px solid #0d0d0d' : '1px solid #333',
                 color: selectedView === view ? '#00ff41' : '#666',
-                padding: '8px 16px',
+                padding: isMobile ? '8px 12px' : '8px 16px',
                 cursor: 'pointer',
                 fontFamily: 'inherit',
                 textTransform: 'uppercase',
@@ -1171,14 +1207,17 @@ const HabitTracker = () => {
             fontSize: '11px',
             color: '#666',
             display: 'grid',
-            gridTemplateColumns: selectedView === 'week' ? '30px 1fr 140px 60px 30px' : '30px 1fr 80px 60px 30px',
-            gap: '8px'
+            gridTemplateColumns: isMobile
+              ? '24px 1fr 32px 50px 24px'
+              : selectedView === 'week' ? '30px 1fr 40px 140px 76px 30px' : '30px 1fr 40px 80px 76px 30px',
+            gap: isMobile ? '6px' : '8px'
           }}>
             <span></span>
             <span>HABIT</span>
-            <span>{selectedView === 'week' ? 'M  T  W  T  F  S  S' : 'STREAK'}</span>
-            <span>STATUS</span>
-            <span></span>
+            <span>{isMobile ? '' : '×'}</span>
+            <span>{isMobile ? '' : (selectedView === 'week' ? 'M  T  W  T  F  S  S' : 'STREAK')}</span>
+            <span>{isMobile ? '' : 'STATUS'}</span>
+            {!isMobile && <span></span>}
           </div>
 
           {loading ? (
@@ -1228,91 +1267,254 @@ const HabitTracker = () => {
               <div
                 key={habit.id}
                 style={{
-                  display: 'grid',
-                  gridTemplateColumns: selectedView === 'week' ? '30px 1fr 140px 60px 30px' : '30px 1fr 80px 60px 30px',
-                  gap: '8px',
-                  padding: '12px',
+                  padding: isMobile ? '10px 12px' : '12px',
                   borderBottom: index < habits.length - 1 ? '1px solid #222' : 'none',
-                  alignItems: 'center',
                   transition: 'background 0.15s',
                   backgroundColor: habit.completed_today ? 'rgba(0,255,65,0.03)' : 'transparent'
                 }}
               >
-                <span style={{ 
-                  fontSize: '16px',
-                  color: habit.completed_today ? '#00ff41' : '#444',
-                  textShadow: habit.completed_today ? '0 0 8px #00ff41' : 'none'
-                }}>
-                  {habit.icon}
-                </span>
-                
-                <div>
-                  <span style={{ 
-                    color: habit.completed_today ? '#00ff41' : '#888',
-                    fontSize: '13px'
-                  }}>
-                    {habit.name}
-                  </span>
-                </div>
-
-                {selectedView === 'week' ? (
-                  <div style={{ display: 'flex', gap: '8px' }}>
-                    {(habit.history || [0,0,0,0,0,0,0]).map((day, i) => (
-                      <span 
-                        key={i}
+                {isMobile ? (
+                  /* Mobile: Two-row layout */
+                  <>
+                    {/* Top row: Info items */}
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      marginBottom: '8px'
+                    }}>
+                      <span style={{
+                        fontSize: '16px',
+                        color: habit.completed_today ? '#00ff41' : '#444',
+                        textShadow: habit.completed_today ? '0 0 8px #00ff41' : 'none'
+                      }}>
+                        {habit.icon}
+                      </span>
+                      <span style={{
+                        color: habit.completed_today ? '#00ff41' : '#888',
+                        fontSize: '13px',
+                        flex: 1
+                      }}>
+                        {habit.name}
+                      </span>
+                      <div style={{ display: 'flex', gap: '3px' }}>
+                        {Array.from({ length: habit.daily_goal || 1 }).map((_, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              fontSize: '10px',
+                              color: i < (habit.completions_today || 0) ? '#00ff41' : '#555',
+                              textShadow: i < (habit.completions_today || 0) ? '0 0 4px #00ff41' : 'none'
+                            }}
+                          >
+                            {i < (habit.completions_today || 0) ? '●' : '○'}
+                          </span>
+                        ))}
+                      </div>
+                      <span style={{
+                        color: habit.streak > 7 ? '#00ff41' : habit.streak > 3 ? '#ffaa00' : '#666',
+                        fontSize: '11px',
+                        minWidth: '35px',
+                        textAlign: 'right'
+                      }}>
+                        {habit.streak > 0 ? `${habit.streak}🔥` : '---'}
+                      </span>
+                    </div>
+                    {/* Bottom row: Action items */}
+                    <div style={{
+                      display: 'flex',
+                      gap: '8px',
+                      paddingLeft: '24px'
+                    }}>
+                      {confirmingDeleteId === habit.id ? (
+                        <button
+                          onClick={() => {
+                            deleteHabit(habit.id);
+                            setConfirmingDeleteId(null);
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: '1px solid #ff4444',
+                            color: '#ff4444',
+                            padding: '8px 16px',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            fontSize: '10px',
+                            transition: 'all 0.15s',
+                            minHeight: '36px'
+                          }}
+                        >
+                          [CONFIRM DELETE]
+                        </button>
+                      ) : (
+                        <button
+                          onClick={() => incrementHabit(habit.id)}
+                          style={{
+                            background: 'transparent',
+                            border: `1px solid ${habit.completed_today ? '#00ff41' : '#444'}`,
+                            color: habit.completed_today ? '#00ff41' : '#666',
+                            padding: '8px 16px',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            fontSize: '10px',
+                            transition: 'all 0.15s',
+                            minHeight: '36px'
+                          }}
+                        >
+                          {habit.completed_today ? '[DONE]' : '[    ]'}
+                        </button>
+                      )}
+                      <button
+                        onClick={() => {
+                          if (confirmingDeleteId === habit.id) {
+                            setConfirmingDeleteId(null);
+                          } else {
+                            setConfirmingDeleteId(habit.id);
+                          }
+                        }}
                         style={{
-                          color: day ? '#00ff41' : '#333',
-                          fontSize: '14px'
+                          background: 'transparent',
+                          border: '1px solid #333',
+                          color: confirmingDeleteId === habit.id ? '#ff4444' : '#666',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          fontSize: '10px',
+                          padding: '8px 12px',
+                          transition: 'all 0.15s',
+                          minHeight: '36px'
                         }}
                       >
-                        {day ? '■' : '□'}
-                      </span>
-                    ))}
-                  </div>
+                        {confirmingDeleteId === habit.id ? '[CANCEL]' : '[DEL]'}
+                      </button>
+                    </div>
+                  </>
                 ) : (
-                  <span style={{ 
-                    color: habit.streak > 7 ? '#00ff41' : habit.streak > 3 ? '#ffaa00' : '#666',
-                    fontSize: '12px'
+                  /* Desktop: Single-row grid layout */
+                  <div style={{
+                    display: 'grid',
+                    gridTemplateColumns: selectedView === 'week' ? '30px 1fr 40px 140px 76px 30px' : '30px 1fr 40px 80px 76px 30px',
+                    gap: '8px',
+                    alignItems: 'center'
                   }}>
-                    {habit.streak > 0 ? `${habit.streak}d 🔥` : '---'}
-                  </span>
+                    <span style={{
+                      fontSize: '16px',
+                      color: habit.completed_today ? '#00ff41' : '#444',
+                      textShadow: habit.completed_today ? '0 0 8px #00ff41' : 'none'
+                    }}>
+                      {habit.icon}
+                    </span>
+
+                    <div>
+                      <span style={{
+                        color: habit.completed_today ? '#00ff41' : '#888',
+                        fontSize: '13px'
+                      }}>
+                        {habit.name}
+                      </span>
+                    </div>
+
+                    <div style={{ display: 'flex', gap: '3px' }}>
+                      {Array.from({ length: habit.daily_goal || 1 }).map((_, i) => (
+                        <span
+                          key={i}
+                          style={{
+                            fontSize: '10px',
+                            color: i < (habit.completions_today || 0) ? '#00ff41' : '#555',
+                            textShadow: i < (habit.completions_today || 0) ? '0 0 4px #00ff41' : 'none'
+                          }}
+                        >
+                          {i < (habit.completions_today || 0) ? '●' : '○'}
+                        </span>
+                      ))}
+                    </div>
+
+                    {selectedView === 'week' ? (
+                      <div style={{ display: 'flex', gap: '8px', alignItems: 'center' }}>
+                        {(habit.history || [0,0,0,0,0,0,0]).map((day, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              color: day ? '#00ff41' : '#333',
+                              fontSize: '14px'
+                            }}
+                          >
+                            {day ? '■' : '□'}
+                          </span>
+                        ))}
+                      </div>
+                    ) : (
+                      <span style={{
+                        color: habit.streak > 7 ? '#00ff41' : habit.streak > 3 ? '#ffaa00' : '#666',
+                        fontSize: '12px'
+                      }}>
+                        {habit.streak > 0 ? `${habit.streak}d 🔥` : '---'}
+                      </span>
+                    )}
+
+                    {confirmingDeleteId === habit.id ? (
+                      <button
+                        onClick={() => {
+                          deleteHabit(habit.id);
+                          setConfirmingDeleteId(null);
+                        }}
+                        style={{
+                          background: 'transparent',
+                          border: '1px solid #ff4444',
+                          color: '#ff4444',
+                          padding: '4px 8px',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          fontSize: '10px',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        [CONFIRM]
+                      </button>
+                    ) : (
+                      <button
+                        onClick={() => incrementHabit(habit.id)}
+                        style={{
+                          background: 'transparent',
+                          border: `1px solid ${habit.completed_today ? '#00ff41' : '#444'}`,
+                          color: habit.completed_today ? '#00ff41' : '#666',
+                          padding: '4px 8px',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          fontSize: '10px',
+                          transition: 'all 0.15s'
+                        }}
+                      >
+                        {habit.completed_today ? '[DONE]' : '[    ]'}
+                      </button>
+                    )}
+
+                    <button
+                      onClick={() => {
+                        if (confirmingDeleteId === habit.id) {
+                          setConfirmingDeleteId(null);
+                        } else {
+                          setConfirmingDeleteId(habit.id);
+                        }
+                      }}
+                      style={{
+                        background: 'transparent',
+                        border: 'none',
+                        color: confirmingDeleteId === habit.id ? '#ff4444' : '#666',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: '14px',
+                        padding: '0',
+                        opacity: confirmingDeleteId === habit.id ? 1 : 0.7,
+                        transition: 'all 0.15s'
+                      }}
+                      onMouseEnter={e => e.target.style.opacity = 1}
+                      onMouseLeave={e => { if (confirmingDeleteId !== habit.id) e.target.style.opacity = 0.5 }}
+                      title={confirmingDeleteId === habit.id ? 'Cancel delete' : 'Delete habit'}
+                    >
+                      ×
+                    </button>
+                  </div>
                 )}
-
-                <button
-                  onClick={() => toggleHabit(habit.id)}
-                  style={{
-                    background: 'transparent',
-                    border: `1px solid ${habit.completed_today ? '#00ff41' : '#444'}`,
-                    color: habit.completed_today ? '#00ff41' : '#666',
-                    padding: '4px 8px',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: '10px',
-                    transition: 'all 0.15s'
-                  }}
-                >
-                  {habit.completed_today ? '[DONE]' : '[    ]'}
-                </button>
-
-                <button
-                  onClick={() => deleteHabit(habit.id)}
-                  style={{
-                    background: 'transparent',
-                    border: 'none',
-                    color: '#444',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: '14px',
-                    padding: '0',
-                    opacity: 0.5,
-                    transition: 'opacity 0.15s'
-                  }}
-                  onMouseEnter={e => e.target.style.opacity = 1}
-                  onMouseLeave={e => e.target.style.opacity = 0.5}
-                  title="Delete habit"
-                >
-                  ×
-                </button>
               </div>
             ))
           )}
@@ -1724,26 +1926,48 @@ const HabitTracker = () => {
                 &gt; NEW HABIT{cursorBlink ? '▌' : ' '}
               </div>
               
-              <input
-                type="text"
-                value={newHabitName}
-                onChange={(e) => setNewHabitName(e.target.value)}
-                placeholder="enter habit name..."
-                autoFocus
-                style={{
-                  width: '100%',
-                  padding: '12px',
-                  backgroundColor: '#0a0a0a',
-                  border: '1px solid #333',
-                  color: '#fff',
-                  fontFamily: 'inherit',
-                  fontSize: '14px',
-                  marginBottom: '16px',
-                  outline: 'none'
-                }}
-                onKeyDown={(e) => e.key === 'Enter' && addHabit()}
-              />
-              
+              <div style={{ display: 'flex', gap: '8px', marginBottom: '16px' }}>
+                <input
+                  type="text"
+                  value={newHabitName}
+                  onChange={(e) => setNewHabitName(e.target.value)}
+                  placeholder="enter habit name..."
+                  autoFocus
+                  style={{
+                    flex: 1,
+                    padding: '12px',
+                    backgroundColor: '#0a0a0a',
+                    border: '1px solid #333',
+                    color: '#fff',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    outline: 'none'
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && addHabit()}
+                />
+                <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
+                  <span style={{ color: '#666', fontSize: '11px' }}>×</span>
+                  <input
+                    type="number"
+                    min="1"
+                    max="10"
+                    value={newHabitGoal}
+                    onChange={(e) => setNewHabitGoal(Math.max(1, Math.min(10, parseInt(e.target.value) || 1)))}
+                    style={{
+                      width: '40px',
+                      padding: '12px 8px',
+                      backgroundColor: '#0a0a0a',
+                      border: '1px solid #333',
+                      color: '#fff',
+                      fontFamily: 'inherit',
+                      fontSize: '14px',
+                      textAlign: 'center',
+                      outline: 'none'
+                    }}
+                  />
+                </div>
+              </div>
+
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={addHabit}
@@ -1768,6 +1992,7 @@ const HabitTracker = () => {
                   onClick={() => {
                     setShowAddModal(false);
                     setNewHabitName('');
+                    setNewHabitGoal(1);
                   }}
                   style={{
                     flex: 1,
