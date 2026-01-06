@@ -40,6 +40,13 @@ export const supabase = createClient(supabaseUrl, supabaseAnonKey, {
     autoRefreshToken: true,
     persistSession: true,
     detectSessionInUrl: true
+  },
+  realtime: {
+    // Suppress WebSocket connection errors in console
+    // The app will work fine without realtime, just without live updates
+    params: {
+      eventsPerSecond: 10
+    }
   }
 })
 

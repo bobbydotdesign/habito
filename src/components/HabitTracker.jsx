@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 
 const HabitTracker = () => {
@@ -83,8 +83,19 @@ const HabitTracker = () => {
 
   // Auth state listener
   useEffect(() => {
+    // Check for password recovery token in URL hash
+    const hashParams = new URLSearchParams(window.location.hash.substring(1));
+    const type = hashParams.get('type');
+    const accessToken = hashParams.get('access_token');
+    
     supabase.auth.getSession().then(({ data: { session } }) => {
       setUser(session?.user ?? null);
+      
+      // If we have a recovery token in URL, show password reset modal
+      if (type === 'recovery' && accessToken) {
+        setShowPasswordReset(true);
+      }
+      
       if (session?.user) {
         fetchHabits(session.user.id).then(data => {
           setHabits(data);
@@ -99,8 +110,12 @@ const HabitTracker = () => {
       setUser(session?.user ?? null);
       
       // Handle password recovery flow
-      if (event === 'PASSWORD_RECOVERY') {
-        setShowPasswordReset(true);
+      if (event === 'PASSWORD_RECOVERY' || event === 'TOKEN_REFRESHED') {
+        // Check if this is a password recovery session
+        const hashParams = new URLSearchParams(window.location.hash.substring(1));
+        if (hashParams.get('type') === 'recovery') {
+          setShowPasswordReset(true);
+        }
       }
       
       if (session?.user) {
@@ -119,30 +134,57 @@ const HabitTracker = () => {
   useEffect(() => {
     if (!user) return;
 
-    const channel = supabase
-      .channel('habits-changes')
-      .on(
-        'postgres_changes',
-        {
-          event: '*',
-          schema: 'public',
-          table: 'habits',
-          filter: `user_id=eq.${user.id}`
-        },
-        (payload) => {
-          if (payload.eventType === 'INSERT') {
-            setHabits(prev => [...prev, payload.new]);
-          } else if (payload.eventType === 'UPDATE') {
-            setHabits(prev => prev.map(h => h.id === payload.new.id ? payload.new : h));
-          } else if (payload.eventType === 'DELETE') {
-            setHabits(prev => prev.filter(h => h.id !== payload.old.id));
+    let channel;
+    
+    try {
+      channel = supabase
+        .channel('habits-changes')
+        .on(
+          'postgres_changes',
+          {
+            event: '*',
+            schema: 'public',
+            table: 'habits',
+            filter: `user_id=eq.${user.id}`
+          },
+          (payload) => {
+            if (payload.eventType === 'INSERT') {
+              setHabits(prev => [...prev, payload.new]);
+            } else if (payload.eventType === 'UPDATE') {
+              setHabits(prev => prev.map(h => h.id === payload.new.id ? payload.new : h));
+            } else if (payload.eventType === 'DELETE') {
+              setHabits(prev => prev.filter(h => h.id !== payload.old.id));
+            }
           }
-        }
-      )
-      .subscribe();
+        )
+        .subscribe((status) => {
+          if (status === 'SUBSCRIBED') {
+            // Successfully subscribed - realtime is working
+            if (import.meta.env.DEV) {
+              console.log('✅ Realtime subscription active');
+            }
+          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
+            // Realtime failed - app will still work, just without live updates
+            if (import.meta.env.DEV) {
+              console.warn('⚠️ Realtime subscription failed - app will work without live updates');
+            }
+          }
+        });
+    } catch (error) {
+      // Gracefully handle subscription errors
+      if (import.meta.env.DEV) {
+        console.warn('⚠️ Could not establish realtime connection:', error.message);
+      }
+    }
 
     return () => {
-      supabase.removeChannel(channel);
+      if (channel) {
+        try {
+          supabase.removeChannel(channel);
+        } catch (error) {
+          // Ignore cleanup errors
+        }
+      }
     };
   }, [user]);
 
@@ -171,6 +213,12 @@ const HabitTracker = () => {
   const [authMode, setAuthMode] = useState('signin'); // 'signin', 'signup', 'magic'
   const [showPasswordReset, setShowPasswordReset] = useState(false);
   const [newPassword, setNewPassword] = useState('');
+  const [showSettings, setShowSettings] = useState(false);
+  const [settingsPassword, setSettingsPassword] = useState('');
+  const [settingsNewPassword, setSettingsNewPassword] = useState('');
+  const [settingsMessage, setSettingsMessage] = useState('');
+  const [settingsLoading, setSettingsLoading] = useState(false);
+  const isUpdatingPassword = useRef(false);
 
   const signInWithPassword = async () => {
     if (!email.trim() || !password.trim()) return;
@@ -318,33 +366,151 @@ const HabitTracker = () => {
       return;
     }
     
+    // Prevent multiple simultaneous calls
+    if (isUpdatingPassword.current) {
+      return;
+    }
+    
+    isUpdatingPassword.current = true;
     setAuthLoading(true);
     setAuthMessage('');
     
+    // Set a timeout to prevent infinite hanging
+    const timeoutId = setTimeout(() => {
+      if (isUpdatingPassword.current) {
+        isUpdatingPassword.current = false;
+        setAuthLoading(false);
+        setAuthMessage('Request timed out. Please check your connection and try again.');
+        console.error('Password update timed out');
+      }
+    }, 10000);
+    
     try {
-      const { error } = await supabase.auth.updateUser({
+      console.log('Updating password...');
+      const { data, error } = await supabase.auth.updateUser({
         password: newPassword.trim()
       });
       
+      clearTimeout(timeoutId);
+      isUpdatingPassword.current = false;
+      
       if (error) {
         console.error('Password update error:', error);
-        setAuthMessage(`Error: ${error.message}`);
+        if (error.message && (error.message.includes('Failed to fetch') || error.message.includes('Network'))) {
+          setAuthMessage('Network error. Please check your connection and try again.');
+        } else {
+          setAuthMessage(`Error: ${error.message}`);
+        }
+        setAuthLoading(false);
       } else {
+        console.log('Password updated successfully');
         setAuthMessage('Password updated successfully!');
-        setShowPasswordReset(false);
-        setNewPassword('');
+        
+        // Clear URL hash if present
+        if (window.location.hash.includes('type=recovery')) {
+          window.history.replaceState(null, '', window.location.pathname);
+        }
+        
+        // Don't wait for session refresh - it might hang
+        supabase.auth.refreshSession().catch(err => {
+          console.warn('Session refresh failed (non-critical):', err);
+        });
+        
+        // Close modal after a brief delay
+        setTimeout(() => {
+          setShowPasswordReset(false);
+          setNewPassword('');
+          setAuthMessage('');
+          setAuthLoading(false);
+        }, 1500);
       }
     } catch (err) {
+      clearTimeout(timeoutId);
+      isUpdatingPassword.current = false;
       console.error('Failed to update password:', err);
-      setAuthMessage('Connection error. Please try again.');
-    } finally {
+      if (err.message && err.message.includes('Failed to fetch')) {
+        setAuthMessage('Network error. Please check your connection and try again.');
+      } else {
+        setAuthMessage(`Error: ${err.message || 'Connection error. Please try again.'}`);
+      }
       setAuthLoading(false);
     }
   };
 
+  const changePassword = async () => {
+    if (!user?.email) {
+      setSettingsMessage('Error: User email not found');
+      return;
+    }
+    
+    if (!settingsPassword.trim() || !settingsNewPassword.trim()) {
+      setSettingsMessage('Error: Please enter both current and new password');
+      return;
+    }
+    if (settingsNewPassword.length < 6) {
+      setSettingsMessage('Error: New password must be at least 6 characters');
+      return;
+    }
+    
+    setSettingsLoading(true);
+    setSettingsMessage('');
+    
+    try {
+      // First verify current password by trying to sign in
+      const { error: signInError } = await supabase.auth.signInWithPassword({
+        email: user.email,
+        password: settingsPassword.trim()
+      });
+      
+      if (signInError) {
+        setSettingsMessage('Error: Current password is incorrect');
+        setSettingsLoading(false);
+        return;
+      }
+      
+      // If current password is correct, update to new password
+      const { error: updateError } = await supabase.auth.updateUser({
+        password: settingsNewPassword.trim()
+      });
+      
+      if (updateError) {
+        console.error('Password update error:', updateError);
+        setSettingsMessage(`Error: ${updateError.message}`);
+      } else {
+        setSettingsMessage('Password changed successfully!');
+        setSettingsPassword('');
+        setSettingsNewPassword('');
+        setTimeout(() => {
+          setSettingsMessage('');
+        }, 2000);
+      }
+    } catch (err) {
+      console.error('Failed to change password:', err);
+      setSettingsMessage(`Error: ${err.message || 'Failed to change password. Please try again.'}`);
+    } finally {
+      setSettingsLoading(false);
+    }
+  };
+
   const signOut = async () => {
-    await supabase.auth.signOut();
-    setHabits([]);
+    try {
+      const { error } = await supabase.auth.signOut();
+      if (error) {
+        console.error('Sign out error:', error);
+        // Still clear local state even if sign out fails
+      }
+      setHabits([]);
+      setUser(null);
+      // Clear any modals
+      setShowAddModal(false);
+      setShowPasswordReset(false);
+      setShowSettings(false);
+    } catch (err) {
+      console.error('Failed to sign out:', err);
+      // Force clear local state
+      setHabits([]);
+      setUser(null);
+    }
   };
 
   const toggleHabit = async (id) => {
@@ -795,6 +961,29 @@ const HabitTracker = () => {
                 {cursorBlink ? '●' : '○'} ONLINE
               </span>
               <button
+                onClick={() => setShowSettings(true)}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #333',
+                  color: '#666',
+                  padding: '4px 8px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: '9px',
+                  letterSpacing: '0.5px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.borderColor = '#00ff41';
+                  e.target.style.color = '#00ff41';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.borderColor = '#333';
+                  e.target.style.color = '#666';
+                }}
+              >
+                [SETTINGS]
+              </button>
+              <button
                 onClick={signOut}
                 style={{
                   background: 'transparent',
@@ -805,6 +994,14 @@ const HabitTracker = () => {
                   fontFamily: 'inherit',
                   fontSize: '9px',
                   letterSpacing: '0.5px'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.borderColor = '#ff4444';
+                  e.target.style.color = '#ff4444';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.borderColor = '#333';
+                  e.target.style.color = '#666';
                 }}
               >
                 [LOGOUT]
@@ -1215,6 +1412,194 @@ const HabitTracker = () => {
                   [SKIP]
                 </button>
               </div>
+            </div>
+          </div>
+        )}
+
+        {/* Settings Modal */}
+        {showSettings && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000
+          }}>
+            <div style={{
+              backgroundColor: '#0d0d0d',
+              border: '1px solid #333',
+              padding: '24px',
+              width: '90%',
+              maxWidth: '500px'
+            }}>
+              <div style={{ 
+                color: '#00ff41', 
+                marginBottom: '20px',
+                fontSize: '12px',
+                letterSpacing: '1px',
+                display: 'flex',
+                justifyContent: 'space-between',
+                alignItems: 'center'
+              }}>
+                <span>&gt; USER SETTINGS{cursorBlink ? '▌' : ' '}</span>
+                <button
+                  onClick={() => {
+                    setShowSettings(false);
+                    setSettingsPassword('');
+                    setSettingsNewPassword('');
+                    setSettingsMessage('');
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#666',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: '16px',
+                    padding: '0 8px'
+                  }}
+                  onMouseEnter={(e) => e.target.style.color = '#ff4444'}
+                  onMouseLeave={(e) => e.target.style.color = '#666'}
+                >
+                  ×
+                </button>
+              </div>
+
+              {/* User Info */}
+              <div style={{
+                border: '1px solid #333',
+                padding: '16px',
+                marginBottom: '20px',
+                backgroundColor: '#0a0a0a'
+              }}>
+                <div style={{ color: '#666', fontSize: '10px', marginBottom: '8px' }}>EMAIL</div>
+                <div style={{ color: '#fff', fontSize: '13px' }}>{user?.email || 'N/A'}</div>
+              </div>
+
+              {/* Change Password Section */}
+              <div style={{
+                border: '1px solid #333',
+                padding: '16px',
+                marginBottom: '16px',
+                backgroundColor: '#0a0a0a'
+              }}>
+                <div style={{ 
+                  color: '#00ff41', 
+                  marginBottom: '16px',
+                  fontSize: '11px',
+                  letterSpacing: '1px'
+                }}>
+                  CHANGE PASSWORD
+                </div>
+
+                <input
+                  type="password"
+                  value={settingsPassword}
+                  onChange={(e) => setSettingsPassword(e.target.value)}
+                  placeholder="current password"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    backgroundColor: '#0d0d0d',
+                    border: '1px solid #333',
+                    color: '#fff',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    marginBottom: '12px',
+                    outline: 'none'
+                  }}
+                  onFocus={(e) => e.target.style.borderColor = '#00ff41'}
+                  onBlur={(e) => e.target.style.borderColor = '#333'}
+                />
+
+                <input
+                  type="password"
+                  value={settingsNewPassword}
+                  onChange={(e) => setSettingsNewPassword(e.target.value)}
+                  placeholder="new password (min 6 characters)"
+                  style={{
+                    width: '100%',
+                    padding: '12px',
+                    backgroundColor: '#0d0d0d',
+                    border: '1px solid #333',
+                    color: '#fff',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    marginBottom: '12px',
+                    outline: 'none'
+                  }}
+                  onKeyDown={(e) => e.key === 'Enter' && changePassword()}
+                  onFocus={(e) => e.target.style.borderColor = '#00ff41'}
+                  onBlur={(e) => e.target.style.borderColor = '#333'}
+                />
+
+                {settingsMessage && (
+                  <div style={{
+                    marginBottom: '12px',
+                    padding: '12px',
+                    backgroundColor: settingsMessage.includes('Error') ? 'rgba(255,0,0,0.1)' : 'rgba(0,255,65,0.1)',
+                    border: `1px solid ${settingsMessage.includes('Error') ? '#ff4444' : '#00ff41'}`,
+                    color: settingsMessage.includes('Error') ? '#ff4444' : '#00ff41',
+                    fontSize: '11px',
+                    textAlign: 'center'
+                  }}>
+                    {settingsMessage}
+                  </div>
+                )}
+
+                <button
+                  onClick={changePassword}
+                  disabled={settingsLoading}
+                  style={{
+                    width: '100%',
+                    padding: '10px',
+                    backgroundColor: settingsLoading ? '#1a1a1a' : '#00ff41',
+                    border: 'none',
+                    color: settingsLoading ? '#666' : '#000',
+                    cursor: settingsLoading ? 'wait' : 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    letterSpacing: '1px',
+                    opacity: settingsLoading ? 0.7 : 1
+                  }}
+                >
+                  {settingsLoading ? '[UPDATING...]' : '[CHANGE PASSWORD]'}
+                </button>
+              </div>
+
+              {/* Logout Button */}
+              <button
+                onClick={() => {
+                  setShowSettings(false);
+                  signOut();
+                }}
+                style={{
+                  width: '100%',
+                  padding: '10px',
+                  backgroundColor: 'transparent',
+                  border: '1px solid #ff4444',
+                  color: '#ff4444',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: '11px',
+                  letterSpacing: '1px',
+                  transition: 'all 0.15s'
+                }}
+                onMouseEnter={(e) => {
+                  e.target.style.backgroundColor = 'rgba(255,68,68,0.1)';
+                }}
+                onMouseLeave={(e) => {
+                  e.target.style.backgroundColor = 'transparent';
+                }}
+              >
+                [LOGOUT]
+              </button>
             </div>
           </div>
         )}
