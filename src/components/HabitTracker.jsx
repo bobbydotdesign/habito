@@ -696,22 +696,24 @@ const HabitTracker = () => {
           position: 'relative',
           zIndex: 1
         }}>
-          <pre style={{ 
-            color: '#00ff41', 
-            fontSize: '8px', 
-            lineHeight: '1.2',
-            marginBottom: '30px',
-            textShadow: '0 0 10px #00ff41'
-          }}>
+          <div style={{ display: 'inline-flex', alignItems: 'flex-end', marginBottom: '30px' }}>
+            <pre style={{
+              color: '#00ff41',
+              fontSize: '8px',
+              lineHeight: '1.2',
+              margin: 0,
+              textShadow: '0 0 10px #00ff41'
+            }}>
 {`
  ██╗  ██╗ █████╗ ██████╗ ██╗████████╗ ██████╗
  ██║  ██║██╔══██╗██╔══██╗██║╚══██╔══╝██╔═══██╗
  ███████║███████║██████╔╝██║   ██║   ██║   ██║
  ██╔══██║██╔══██║██╔══██╗██║   ██║   ██║   ██║
  ██║  ██║██║  ██║██████╔╝██║   ██║   ╚██████╔╝
- ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝    ╚═════╝
-`}
-          </pre>
+ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝    ╚═════╝`}
+            </pre>
+            <span style={{ color: '#666', fontSize: '12px', marginLeft: '2px' }}>.space</span>
+          </div>
 
           <div style={{
             border: '1px solid #333',
@@ -948,23 +950,25 @@ const HabitTracker = () => {
         
         {/* Header */}
         <div style={{ marginBottom: '30px' }}>
-          <pre style={{ 
-            color: '#00ff41', 
-            fontSize: '10px', 
-            lineHeight: '1.2',
-            marginBottom: '20px',
-            textShadow: '0 0 10px #00ff41'
-          }}>
+          <div style={{ display: 'inline-flex', alignItems: 'flex-end', marginBottom: '20px' }}>
+            <pre style={{
+              color: '#00ff41',
+              fontSize: '10px',
+              lineHeight: '1.2',
+              margin: 0,
+              textShadow: '0 0 10px #00ff41'
+            }}>
 {`
  ██╗  ██╗ █████╗ ██████╗ ██╗████████╗ ██████╗
  ██║  ██║██╔══██╗██╔══██╗██║╚══██╔══╝██╔═══██╗
  ███████║███████║██████╔╝██║   ██║   ██║   ██║
  ██╔══██║██╔══██║██╔══██╗██║   ██║   ██║   ██║
  ██║  ██║██║  ██║██████╔╝██║   ██║   ╚██████╔╝
- ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝    ╚═════╝
-`}
-          </pre>
-          
+ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝    ╚═════╝`}
+            </pre>
+            <span style={{ color: '#666', fontSize: '12px', marginLeft: '2px' }}>.space</span>
+          </div>
+
           <div style={{ 
             borderTop: '1px solid #333',
             borderBottom: '1px solid #333',
