@@ -89,83 +89,56 @@ const HabitTracker = () => {
     return updatedHabits;
   }, [checkDayChange]);
 
-  // Auth state listener
+  // Auth state listener - uses onAuthStateChange exclusively (recommended by Supabase)
+  // This avoids issues where getSession() can hang with corrupted localStorage
   useEffect(() => {
     // Check for password recovery token in URL hash
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get('type');
     const accessToken = hashParams.get('access_token');
 
-    // Add timeout for session check (handles iframe/storage restrictions)
-    const sessionTimeout = setTimeout(() => {
-      console.warn('Session check timed out - proceeding without auth');
-      setLoading(false);
-    }, 5000);
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      clearTimeout(sessionTimeout);
-      setUser(session?.user ?? null);
-
-      // If we have a recovery token in URL, show password reset modal
-      if (type === 'recovery' && accessToken) {
-        setShowPasswordReset(true);
-      }
-
-      if (session?.user) {
-        fetchHabits(session.user.id).then(data => {
-          setHabits(data);
-          setLoading(false);
-        }).catch(err => {
-          console.error('Error fetching habits:', err);
-          setLoading(false);
-        });
-      } else {
-        setLoading(false);
-      }
-    }).catch(err => {
-      clearTimeout(sessionTimeout);
-      console.error('Session check failed:', err);
-      setLoading(false);
-    });
+    // Show password reset modal if recovery token in URL
+    if (type === 'recovery' && accessToken) {
+      setShowPasswordReset(true);
+    }
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
-      console.log('Auth state changed:', event, session?.user?.email || 'no user');
-      
+      console.log('Auth event:', event, session?.user?.email || 'no user');
+
+      // Update user state
       setUser(session?.user ?? null);
-      
-      // Handle sign out explicitly
+
+      // Handle sign out
       if (event === 'SIGNED_OUT') {
         setHabits([]);
-        setUser(null);
         setShowAddModal(false);
         setShowPasswordReset(false);
         setShowSettings(false);
         setLoading(false);
         return;
       }
-      
-      // Handle password recovery flow
-      if (event === 'PASSWORD_RECOVERY' || event === 'TOKEN_REFRESHED') {
-        // Check if this is a password recovery session
-        const hashParams = new URLSearchParams(window.location.hash.substring(1));
-        if (hashParams.get('type') === 'recovery') {
-          setShowPasswordReset(true);
-        }
+
+      // Handle password recovery
+      if (event === 'PASSWORD_RECOVERY') {
+        setShowPasswordReset(true);
       }
-      
+
+      // Fetch habits if user exists
       if (session?.user) {
-        const data = await fetchHabits(session.user.id);
-        setHabits(data);
+        try {
+          const data = await fetchHabits(session.user.id);
+          setHabits(data);
+        } catch (err) {
+          console.error('Error fetching habits:', err);
+        }
       } else {
         setHabits([]);
       }
+
       setLoading(false);
     });
 
-    return () => {
-      clearTimeout(sessionTimeout);
-      subscription.unsubscribe();
-    };
+    return () => subscription.unsubscribe();
   }, [fetchHabits]);
 
   // Real-time subscription for live sync across browser instances
