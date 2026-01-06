@@ -1,0 +1,982 @@
+import React, { useState, useEffect, useCallback } from 'react';
+import { supabase } from '../lib/supabase';
+
+const HabitTracker = () => {
+  const [user, setUser] = useState(null);
+  const [habits, setHabits] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [showAddModal, setShowAddModal] = useState(false);
+  const [newHabitName, setNewHabitName] = useState('');
+  const [selectedView, setSelectedView] = useState('today');
+  const [cursorBlink, setCursorBlink] = useState(true);
+  const [bootSequence, setBootSequence] = useState(true);
+  const [bootLine, setBootLine] = useState(0);
+  const [syncing, setSyncing] = useState(false);
+
+  const bootMessages = [
+    '> HABIT_OS v2.4.1 initializing...',
+    '> loading neural pathways.......... OK',
+    '> scanning habit matrix............ OK', 
+    '> streak engine online............. OK',
+    '> welcome back, operator.',
+    ''
+  ];
+
+  const icons = ['◎', '▣', '△', '▢', '○', '◇', '▽', '□', '●', '◆'];
+
+  // Check for day change and update habits accordingly
+  const checkDayChange = useCallback((habitsData) => {
+    const lastVisit = localStorage.getItem('lastVisit');
+    const today = new Date().toDateString();
+    
+    if (lastVisit && lastVisit !== today) {
+      localStorage.setItem('lastVisit', today);
+      // It's a new day - shift history and reset completedToday
+      return habitsData.map(h => ({
+        ...h,
+        completed_today: false,
+        history: [...(h.history || [0,0,0,0,0,0,0]).slice(1), h.completed_today ? 1 : 0],
+        streak: h.completed_today ? h.streak : 0 // Reset streak if didn't complete yesterday
+      }));
+    }
+    
+    if (!lastVisit) {
+      localStorage.setItem('lastVisit', today);
+    }
+    
+    return habitsData;
+  }, []);
+
+  // Fetch habits from Supabase
+  const fetchHabits = useCallback(async (userId) => {
+    const { data, error } = await supabase
+      .from('habits')
+      .select('*')
+      .eq('user_id', userId)
+      .order('created_at', { ascending: true });
+
+    if (error) {
+      console.error('Error fetching habits:', error);
+      return [];
+    }
+
+    // Check for day change
+    const updatedHabits = checkDayChange(data || []);
+    
+    // If habits were updated due to day change, sync back to Supabase
+    if (JSON.stringify(updatedHabits) !== JSON.stringify(data)) {
+      for (const habit of updatedHabits) {
+        await supabase
+          .from('habits')
+          .update({
+            completed_today: habit.completed_today,
+            history: habit.history,
+            streak: habit.streak
+          })
+          .eq('id', habit.id);
+      }
+    }
+
+    return updatedHabits;
+  }, [checkDayChange]);
+
+  // Auth state listener
+  useEffect(() => {
+    supabase.auth.getSession().then(({ data: { session } }) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        fetchHabits(session.user.id).then(data => {
+          setHabits(data);
+          setLoading(false);
+        });
+      } else {
+        setLoading(false);
+      }
+    });
+
+    const { data: { subscription } } = supabase.auth.onAuthStateChange(async (_event, session) => {
+      setUser(session?.user ?? null);
+      if (session?.user) {
+        const data = await fetchHabits(session.user.id);
+        setHabits(data);
+      } else {
+        setHabits([]);
+      }
+      setLoading(false);
+    });
+
+    return () => subscription.unsubscribe();
+  }, [fetchHabits]);
+
+  // Real-time subscription for habit changes
+  useEffect(() => {
+    if (!user) return;
+
+    const channel = supabase
+      .channel('habits-changes')
+      .on(
+        'postgres_changes',
+        {
+          event: '*',
+          schema: 'public',
+          table: 'habits',
+          filter: `user_id=eq.${user.id}`
+        },
+        (payload) => {
+          if (payload.eventType === 'INSERT') {
+            setHabits(prev => [...prev, payload.new]);
+          } else if (payload.eventType === 'UPDATE') {
+            setHabits(prev => prev.map(h => h.id === payload.new.id ? payload.new : h));
+          } else if (payload.eventType === 'DELETE') {
+            setHabits(prev => prev.filter(h => h.id !== payload.old.id));
+          }
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, [user]);
+
+  useEffect(() => {
+    const blinkInterval = setInterval(() => {
+      setCursorBlink(prev => !prev);
+    }, 530);
+    return () => clearInterval(blinkInterval);
+  }, []);
+
+  useEffect(() => {
+    if (bootSequence && bootLine < bootMessages.length) {
+      const timer = setTimeout(() => {
+        setBootLine(prev => prev + 1);
+      }, bootLine === 0 ? 400 : 300);
+      return () => clearTimeout(timer);
+    } else if (bootLine >= bootMessages.length) {
+      setTimeout(() => setBootSequence(false), 600);
+    }
+  }, [bootLine, bootSequence]);
+
+  const [email, setEmail] = useState('');
+  const [authMessage, setAuthMessage] = useState('');
+  const [authLoading, setAuthLoading] = useState(false);
+
+  const signInWithEmail = async () => {
+    if (!email.trim()) return;
+    
+    setAuthLoading(true);
+    setAuthMessage('');
+    
+    const { error } = await supabase.auth.signInWithOtp({
+      email: email.trim(),
+      options: {
+        emailRedirectTo: window.location.origin
+      }
+    });
+    
+    if (error) {
+      setAuthMessage(`Error: ${error.message}`);
+    } else {
+      setAuthMessage('Check your email for the login link!');
+    }
+    setAuthLoading(false);
+  };
+
+  const signOut = async () => {
+    await supabase.auth.signOut();
+    setHabits([]);
+  };
+
+  const toggleHabit = async (id) => {
+    const habit = habits.find(h => h.id === id);
+    if (!habit) return;
+
+    const newCompleted = !habit.completed_today;
+    const newStreak = newCompleted ? habit.streak + 1 : Math.max(0, habit.streak - 1);
+
+    // Optimistic update
+    setHabits(habits.map(h => 
+      h.id === id ? { ...h, completed_today: newCompleted, streak: newStreak } : h
+    ));
+
+    setSyncing(true);
+    const { error } = await supabase
+      .from('habits')
+      .update({ completed_today: newCompleted, streak: newStreak })
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error updating habit:', error);
+      // Revert on error
+      setHabits(habits);
+    }
+    setSyncing(false);
+  };
+
+  const addHabit = async () => {
+    if (!newHabitName.trim() || !user) return;
+
+    const newHabit = {
+      user_id: user.id,
+      name: newHabitName.toLowerCase(),
+      icon: icons[habits.length % icons.length],
+      streak: 0,
+      completed_today: false,
+      history: [0, 0, 0, 0, 0, 0, 0]
+    };
+
+    setSyncing(true);
+    const { data, error } = await supabase
+      .from('habits')
+      .insert([newHabit])
+      .select()
+      .single();
+
+    if (error) {
+      console.error('Error adding habit:', error);
+    } else {
+      setHabits([...habits, data]);
+    }
+    
+    setNewHabitName('');
+    setShowAddModal(false);
+    setSyncing(false);
+  };
+
+  const deleteHabit = async (id) => {
+    setSyncing(true);
+    const { error } = await supabase
+      .from('habits')
+      .delete()
+      .eq('id', id);
+
+    if (error) {
+      console.error('Error deleting habit:', error);
+    } else {
+      setHabits(habits.filter(h => h.id !== id));
+    }
+    setSyncing(false);
+  };
+
+  const completedCount = habits.filter(h => h.completed_today).length;
+  const completionPercent = habits.length > 0 ? Math.round((completedCount / habits.length) * 100) : 0;
+
+  const generateProgressBar = (percent, width = 20) => {
+    const filled = Math.round((percent / 100) * width);
+    const empty = width - filled;
+    return `[${'█'.repeat(filled)}${'░'.repeat(empty)}]`;
+  };
+
+  if (bootSequence) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#0a0a0a',
+        fontFamily: '"IBM Plex Mono", "Fira Code", "SF Mono", monospace',
+        color: '#00ff41',
+        padding: '40px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center'
+      }}>
+        <div style={{ maxWidth: '600px', width: '100%' }}>
+          {bootMessages.slice(0, bootLine).map((msg, i) => (
+            <div key={i} style={{
+              marginBottom: '8px',
+              opacity: i < bootLine - 1 ? 0.6 : 1,
+              fontSize: '14px',
+              letterSpacing: '0.5px'
+            }}>
+              {msg}
+            </div>
+          ))}
+          {bootLine < bootMessages.length && (
+            <span style={{ opacity: cursorBlink ? 1 : 0 }}>▌</span>
+          )}
+        </div>
+      </div>
+    );
+  }
+
+  // Auth screen
+  if (!user) {
+    return (
+      <div style={{
+        minHeight: '100vh',
+        backgroundColor: '#0a0a0a',
+        fontFamily: '"IBM Plex Mono", "Fira Code", "SF Mono", monospace',
+        color: '#c0c0c0',
+        padding: '20px',
+        display: 'flex',
+        alignItems: 'center',
+        justifyContent: 'center',
+        position: 'relative',
+        overflow: 'hidden'
+      }}>
+        {/* Scanline effect */}
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px)',
+          pointerEvents: 'none',
+          zIndex: 1000
+        }} />
+
+        {/* CRT vignette */}
+        <div style={{
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          bottom: 0,
+          background: 'radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.4) 100%)',
+          pointerEvents: 'none',
+          zIndex: 999
+        }} />
+
+        <div style={{ 
+          maxWidth: '400px', 
+          width: '100%', 
+          textAlign: 'center',
+          position: 'relative',
+          zIndex: 1
+        }}>
+          <pre style={{ 
+            color: '#00ff41', 
+            fontSize: '8px', 
+            lineHeight: '1.2',
+            marginBottom: '30px',
+            textShadow: '0 0 10px #00ff41'
+          }}>
+{`
+ ██╗  ██╗ █████╗ ██████╗ ██╗████████╗███████╗
+ ██║  ██║██╔══██╗██╔══██╗██║╚══██╔══╝██╔════╝
+ ███████║███████║██████╔╝██║   ██║   ███████╗
+ ██╔══██║██╔══██║██╔══██╗██║   ██║   ╚════██║
+ ██║  ██║██║  ██║██████╔╝██║   ██║   ███████║
+ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝   ╚══════╝
+`}
+          </pre>
+
+          <div style={{
+            border: '1px solid #333',
+            backgroundColor: '#0d0d0d',
+            padding: '24px'
+          }}>
+            <div style={{ 
+              color: '#00ff41', 
+              marginBottom: '20px',
+              fontSize: '12px',
+              letterSpacing: '1px'
+            }}>
+              &gt; AUTHENTICATION REQUIRED{cursorBlink ? '▌' : ' '}
+            </div>
+
+            <div style={{
+              color: '#666',
+              fontSize: '11px',
+              marginBottom: '24px',
+              lineHeight: '1.6'
+            }}>
+              enter your email to receive a magic login link
+            </div>
+
+            <input
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              placeholder="your@email.com"
+              style={{
+                width: '100%',
+                padding: '12px',
+                backgroundColor: '#0a0a0a',
+                border: '1px solid #333',
+                color: '#fff',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                marginBottom: '12px',
+                outline: 'none'
+              }}
+              onKeyDown={(e) => e.key === 'Enter' && signInWithEmail()}
+              onFocus={(e) => e.target.style.borderColor = '#00ff41'}
+              onBlur={(e) => e.target.style.borderColor = '#333'}
+            />
+
+            <button
+              onClick={signInWithEmail}
+              disabled={authLoading}
+              style={{
+                width: '100%',
+                padding: '14px 20px',
+                backgroundColor: authLoading ? '#1a1a1a' : '#00ff41',
+                border: 'none',
+                color: authLoading ? '#666' : '#000',
+                cursor: authLoading ? 'wait' : 'pointer',
+                fontFamily: 'inherit',
+                fontSize: '12px',
+                fontWeight: 'bold',
+                letterSpacing: '1px',
+                transition: 'all 0.15s'
+              }}
+            >
+              {authLoading ? '[SENDING...]' : '[SEND MAGIC LINK]'}
+            </button>
+
+            {authMessage && (
+              <div style={{
+                marginTop: '16px',
+                padding: '12px',
+                backgroundColor: authMessage.includes('Error') ? 'rgba(255,0,0,0.1)' : 'rgba(0,255,65,0.1)',
+                border: `1px solid ${authMessage.includes('Error') ? '#ff4444' : '#00ff41'}`,
+                color: authMessage.includes('Error') ? '#ff4444' : '#00ff41',
+                fontSize: '11px',
+                textAlign: 'center'
+              }}>
+                {authMessage}
+              </div>
+            )}
+          </div>
+
+          <div style={{
+            marginTop: '24px',
+            fontSize: '10px',
+            color: '#333'
+          }}>
+            HABIT_OS v2.4.1 • consistency compounds
+          </div>
+        </div>
+
+        <style>{`
+          @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+        `}</style>
+      </div>
+    );
+  }
+
+  return (
+    <div style={{
+      minHeight: '100vh',
+      backgroundColor: '#0a0a0a',
+      fontFamily: '"IBM Plex Mono", "Fira Code", "SF Mono", monospace',
+      color: '#c0c0c0',
+      padding: '20px',
+      position: 'relative',
+      overflow: 'hidden'
+    }}>
+      {/* Scanline effect */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px)',
+        pointerEvents: 'none',
+        zIndex: 1000
+      }} />
+
+      {/* CRT vignette */}
+      <div style={{
+        position: 'fixed',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
+        background: 'radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.4) 100%)',
+        pointerEvents: 'none',
+        zIndex: 999
+      }} />
+
+      <div style={{ maxWidth: '700px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
+        
+        {/* Header */}
+        <div style={{ marginBottom: '30px' }}>
+          <pre style={{ 
+            color: '#00ff41', 
+            fontSize: '10px', 
+            lineHeight: '1.2',
+            marginBottom: '20px',
+            textShadow: '0 0 10px #00ff41'
+          }}>
+{`
+ ██╗  ██╗ █████╗ ██████╗ ██╗████████╗███████╗
+ ██║  ██║██╔══██╗██╔══██╗██║╚══██╔══╝██╔════╝
+ ███████║███████║██████╔╝██║   ██║   ███████╗
+ ██╔══██║██╔══██║██╔══██╗██║   ██║   ╚════██║
+ ██║  ██║██║  ██║██████╔╝██║   ██║   ███████║
+ ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝   ╚══════╝
+`}
+          </pre>
+          
+          <div style={{ 
+            borderTop: '1px solid #333',
+            borderBottom: '1px solid #333',
+            padding: '12px 0',
+            display: 'flex',
+            justifyContent: 'space-between',
+            alignItems: 'center',
+            fontSize: '12px'
+          }}>
+            <span style={{ color: '#666' }}>
+              {new Date().toLocaleDateString('en-US', { weekday: 'long', month: 'short', day: 'numeric' }).toUpperCase()}
+            </span>
+            <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+              {syncing && (
+                <span style={{ color: '#ffaa00', fontSize: '10px' }}>
+                  SYNCING...
+                </span>
+              )}
+              <span style={{ color: '#00ff41' }}>
+                {cursorBlink ? '●' : '○'} ONLINE
+              </span>
+              <button
+                onClick={signOut}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #333',
+                  color: '#666',
+                  padding: '4px 8px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: '9px',
+                  letterSpacing: '0.5px'
+                }}
+              >
+                [LOGOUT]
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Stats Panel */}
+        <div style={{
+          border: '1px solid #333',
+          marginBottom: '24px',
+          backgroundColor: '#0d0d0d'
+        }}>
+          <div style={{
+            borderBottom: '1px solid #333',
+            padding: '8px 12px',
+            fontSize: '11px',
+            color: '#666',
+            display: 'flex',
+            justifyContent: 'space-between'
+          }}>
+            <span>┌─ DAILY PROGRESS ─┐</span>
+            <span>{completedCount}/{habits.length} COMPLETE</span>
+          </div>
+          
+          <div style={{ padding: '16px 12px' }}>
+            <div style={{ 
+              display: 'flex', 
+              alignItems: 'center', 
+              gap: '12px',
+              marginBottom: '12px'
+            }}>
+              <span style={{ 
+                fontSize: '28px', 
+                fontWeight: 'bold',
+                color: completionPercent === 100 ? '#00ff41' : '#fff',
+                textShadow: completionPercent === 100 ? '0 0 15px #00ff41' : 'none',
+                minWidth: '70px'
+              }}>
+                {completionPercent}%
+              </span>
+              <span style={{ 
+                fontFamily: 'monospace',
+                fontSize: '14px',
+                color: completionPercent === 100 ? '#00ff41' : '#888',
+                letterSpacing: '1px'
+              }}>
+                {generateProgressBar(completionPercent, 24)}
+              </span>
+            </div>
+            
+            {completionPercent === 100 && (
+              <div style={{
+                color: '#00ff41',
+                fontSize: '11px',
+                animation: 'pulse 2s infinite',
+                letterSpacing: '2px'
+              }}>
+                ★ ALL HABITS COMPLETE ★
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Navigation */}
+        <div style={{
+          display: 'flex',
+          gap: '4px',
+          marginBottom: '16px',
+          fontSize: '11px'
+        }}>
+          {['today', 'week', 'stats'].map(view => (
+            <button
+              key={view}
+              onClick={() => setSelectedView(view)}
+              style={{
+                background: selectedView === view ? '#1a1a1a' : 'transparent',
+                border: '1px solid #333',
+                borderBottom: selectedView === view ? '1px solid #0d0d0d' : '1px solid #333',
+                color: selectedView === view ? '#00ff41' : '#666',
+                padding: '8px 16px',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                textTransform: 'uppercase',
+                letterSpacing: '1px',
+                marginBottom: '-1px'
+              }}
+            >
+              [{view}]
+            </button>
+          ))}
+        </div>
+
+        {/* Habits List */}
+        <div style={{
+          border: '1px solid #333',
+          backgroundColor: '#0d0d0d'
+        }}>
+          <div style={{
+            borderBottom: '1px solid #333',
+            padding: '8px 12px',
+            fontSize: '11px',
+            color: '#666',
+            display: 'grid',
+            gridTemplateColumns: selectedView === 'week' ? '30px 1fr 140px 60px 30px' : '30px 1fr 80px 60px 30px',
+            gap: '8px'
+          }}>
+            <span></span>
+            <span>HABIT</span>
+            <span>{selectedView === 'week' ? 'M  T  W  T  F  S  S' : 'STREAK'}</span>
+            <span>STATUS</span>
+            <span></span>
+          </div>
+
+          {loading ? (
+            <div style={{ 
+              padding: '40px 12px', 
+              textAlign: 'center',
+              color: '#00ff41',
+              fontSize: '12px'
+            }}>
+              loading habits...
+            </div>
+          ) : habits.length === 0 ? (
+            <div style={{ 
+              padding: '40px 12px', 
+              textAlign: 'center',
+              color: '#444',
+              fontSize: '12px'
+            }}>
+              no habits tracked. add one below.
+            </div>
+          ) : (
+            habits.map((habit, index) => (
+              <div
+                key={habit.id}
+                style={{
+                  display: 'grid',
+                  gridTemplateColumns: selectedView === 'week' ? '30px 1fr 140px 60px 30px' : '30px 1fr 80px 60px 30px',
+                  gap: '8px',
+                  padding: '12px',
+                  borderBottom: index < habits.length - 1 ? '1px solid #222' : 'none',
+                  alignItems: 'center',
+                  transition: 'background 0.15s',
+                  backgroundColor: habit.completed_today ? 'rgba(0,255,65,0.03)' : 'transparent'
+                }}
+              >
+                <span style={{ 
+                  fontSize: '16px',
+                  color: habit.completed_today ? '#00ff41' : '#444',
+                  textShadow: habit.completed_today ? '0 0 8px #00ff41' : 'none'
+                }}>
+                  {habit.icon}
+                </span>
+                
+                <div>
+                  <span style={{ 
+                    color: habit.completed_today ? '#00ff41' : '#888',
+                    fontSize: '13px'
+                  }}>
+                    {habit.name}
+                  </span>
+                </div>
+
+                {selectedView === 'week' ? (
+                  <div style={{ display: 'flex', gap: '8px' }}>
+                    {(habit.history || [0,0,0,0,0,0,0]).map((day, i) => (
+                      <span 
+                        key={i}
+                        style={{
+                          color: day ? '#00ff41' : '#333',
+                          fontSize: '14px'
+                        }}
+                      >
+                        {day ? '■' : '□'}
+                      </span>
+                    ))}
+                  </div>
+                ) : (
+                  <span style={{ 
+                    color: habit.streak > 7 ? '#00ff41' : habit.streak > 3 ? '#ffaa00' : '#666',
+                    fontSize: '12px'
+                  }}>
+                    {habit.streak > 0 ? `${habit.streak}d 🔥` : '---'}
+                  </span>
+                )}
+
+                <button
+                  onClick={() => toggleHabit(habit.id)}
+                  style={{
+                    background: 'transparent',
+                    border: `1px solid ${habit.completed_today ? '#00ff41' : '#444'}`,
+                    color: habit.completed_today ? '#00ff41' : '#666',
+                    padding: '4px 8px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: '10px',
+                    transition: 'all 0.15s'
+                  }}
+                >
+                  {habit.completed_today ? '[DONE]' : '[    ]'}
+                </button>
+
+                <button
+                  onClick={() => deleteHabit(habit.id)}
+                  style={{
+                    background: 'transparent',
+                    border: 'none',
+                    color: '#444',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    padding: '0',
+                    opacity: 0.5,
+                    transition: 'opacity 0.15s'
+                  }}
+                  onMouseEnter={e => e.target.style.opacity = 1}
+                  onMouseLeave={e => e.target.style.opacity = 0.5}
+                  title="Delete habit"
+                >
+                  ×
+                </button>
+              </div>
+            ))
+          )}
+        </div>
+
+        {/* Add Habit Button */}
+        <button
+          onClick={() => setShowAddModal(true)}
+          style={{
+            width: '100%',
+            marginTop: '16px',
+            padding: '12px',
+            backgroundColor: 'transparent',
+            border: '1px dashed #333',
+            color: '#666',
+            cursor: 'pointer',
+            fontFamily: 'inherit',
+            fontSize: '12px',
+            letterSpacing: '1px',
+            transition: 'all 0.15s'
+          }}
+          onMouseEnter={e => {
+            e.target.style.borderColor = '#00ff41';
+            e.target.style.color = '#00ff41';
+          }}
+          onMouseLeave={e => {
+            e.target.style.borderColor = '#333';
+            e.target.style.color = '#666';
+          }}
+        >
+          + ADD NEW HABIT
+        </button>
+
+        {/* Stats View */}
+        {selectedView === 'stats' && (
+          <div style={{
+            marginTop: '24px',
+            border: '1px solid #333',
+            backgroundColor: '#0d0d0d'
+          }}>
+            <div style={{
+              borderBottom: '1px solid #333',
+              padding: '8px 12px',
+              fontSize: '11px',
+              color: '#666'
+            }}>
+              ┌─ ANALYTICS ─┐
+            </div>
+            <div style={{ padding: '16px 12px' }}>
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ color: '#666', fontSize: '10px', marginBottom: '4px' }}>LONGEST STREAK</div>
+                <div style={{ color: '#00ff41', fontSize: '24px' }}>
+                  {Math.max(...habits.map(h => h.streak), 0)} days
+                </div>
+              </div>
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ color: '#666', fontSize: '10px', marginBottom: '4px' }}>TOTAL HABITS</div>
+                <div style={{ color: '#fff', fontSize: '24px' }}>{habits.length}</div>
+              </div>
+              <div>
+                <div style={{ color: '#666', fontSize: '10px', marginBottom: '4px' }}>COMPLETION RATE (7D)</div>
+                <div style={{ color: '#ffaa00', fontSize: '24px' }}>
+                  {habits.length > 0 
+                    ? Math.round(habits.reduce((acc, h) => acc + (h.history || []).filter(d => d).length, 0) / (habits.length * 7) * 100)
+                    : 0}%
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Add Modal */}
+        {showAddModal && (
+          <div style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            backgroundColor: 'rgba(0,0,0,0.85)',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            zIndex: 2000
+          }}>
+            <div style={{
+              backgroundColor: '#0d0d0d',
+              border: '1px solid #333',
+              padding: '24px',
+              width: '90%',
+              maxWidth: '400px'
+            }}>
+              <div style={{ 
+                color: '#00ff41', 
+                marginBottom: '16px',
+                fontSize: '12px',
+                letterSpacing: '1px'
+              }}>
+                &gt; NEW HABIT{cursorBlink ? '▌' : ' '}
+              </div>
+              
+              <input
+                type="text"
+                value={newHabitName}
+                onChange={(e) => setNewHabitName(e.target.value)}
+                placeholder="enter habit name..."
+                autoFocus
+                style={{
+                  width: '100%',
+                  padding: '12px',
+                  backgroundColor: '#0a0a0a',
+                  border: '1px solid #333',
+                  color: '#fff',
+                  fontFamily: 'inherit',
+                  fontSize: '14px',
+                  marginBottom: '16px',
+                  outline: 'none'
+                }}
+                onKeyDown={(e) => e.key === 'Enter' && addHabit()}
+              />
+              
+              <div style={{ display: 'flex', gap: '8px' }}>
+                <button
+                  onClick={addHabit}
+                  disabled={syncing}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    backgroundColor: '#00ff41',
+                    border: 'none',
+                    color: '#000',
+                    cursor: syncing ? 'wait' : 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: '11px',
+                    fontWeight: 'bold',
+                    letterSpacing: '1px',
+                    opacity: syncing ? 0.7 : 1
+                  }}
+                >
+                  {syncing ? '[SAVING...]' : '[CONFIRM]'}
+                </button>
+                <button
+                  onClick={() => {
+                    setShowAddModal(false);
+                    setNewHabitName('');
+                  }}
+                  style={{
+                    flex: 1,
+                    padding: '10px',
+                    backgroundColor: 'transparent',
+                    border: '1px solid #444',
+                    color: '#666',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: '11px',
+                    letterSpacing: '1px'
+                  }}
+                >
+                  [CANCEL]
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Footer */}
+        <div style={{
+          marginTop: '32px',
+          paddingTop: '16px',
+          borderTop: '1px solid #222',
+          fontSize: '10px',
+          color: '#333',
+          display: 'flex',
+          justifyContent: 'space-between'
+        }}>
+          <span>HABIT_OS v2.4.1</span>
+          <span>consistency compounds</span>
+        </div>
+      </div>
+
+      <style>{`
+        @import url('https://fonts.googleapis.com/css2?family=IBM+Plex+Mono:wght@400;500;600&display=swap');
+        
+        @keyframes pulse {
+          0%, 100% { opacity: 1; }
+          50% { opacity: 0.5; }
+        }
+        
+        * {
+          box-sizing: border-box;
+        }
+        
+        ::selection {
+          background: #00ff41;
+          color: #000;
+        }
+        
+        input::placeholder {
+          color: #444;
+        }
+        
+        input:focus {
+          border-color: #00ff41 !important;
+        }
+        
+        button:hover {
+          opacity: 0.9;
+        }
+      `}</style>
+    </div>
+  );
+};
+
+export default HabitTracker;
