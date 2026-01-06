@@ -5,6 +5,7 @@ const HabitTracker = () => {
   const [user, setUser] = useState(null);
   const [habits, setHabits] = useState([]);
   const [loading, setLoading] = useState(true);
+  const [fetchError, setFetchError] = useState(null);
   const [showAddModal, setShowAddModal] = useState(false);
   const [newHabitName, setNewHabitName] = useState('');
   const [selectedView, setSelectedView] = useState('today');
@@ -50,6 +51,7 @@ const HabitTracker = () => {
 
   // Fetch habits from Supabase
   const fetchHabits = useCallback(async (userId) => {
+    setFetchError(null);
     const { data, error } = await supabase
       .from('habits')
       .select('*')
@@ -58,12 +60,18 @@ const HabitTracker = () => {
 
     if (error) {
       console.error('Error fetching habits:', error);
+      setFetchError(error.message || 'Failed to load habits');
       return [];
     }
 
-    // Check for day change
-    const updatedHabits = checkDayChange(data || []);
-    
+    // Check for day change - but only if we actually have data
+    // Never process empty results to avoid syncing empty state back
+    if (!data || data.length === 0) {
+      return data || [];
+    }
+
+    const updatedHabits = checkDayChange(data);
+
     // If habits were updated due to day change, sync back to Supabase
     if (JSON.stringify(updatedHabits) !== JSON.stringify(data)) {
       for (const habit of updatedHabits) {
@@ -87,23 +95,37 @@ const HabitTracker = () => {
     const hashParams = new URLSearchParams(window.location.hash.substring(1));
     const type = hashParams.get('type');
     const accessToken = hashParams.get('access_token');
-    
+
+    // Add timeout for session check (handles iframe/storage restrictions)
+    const sessionTimeout = setTimeout(() => {
+      console.warn('Session check timed out - proceeding without auth');
+      setLoading(false);
+    }, 5000);
+
     supabase.auth.getSession().then(({ data: { session } }) => {
+      clearTimeout(sessionTimeout);
       setUser(session?.user ?? null);
-      
+
       // If we have a recovery token in URL, show password reset modal
       if (type === 'recovery' && accessToken) {
         setShowPasswordReset(true);
       }
-      
+
       if (session?.user) {
         fetchHabits(session.user.id).then(data => {
           setHabits(data);
+          setLoading(false);
+        }).catch(err => {
+          console.error('Error fetching habits:', err);
           setLoading(false);
         });
       } else {
         setLoading(false);
       }
+    }).catch(err => {
+      clearTimeout(sessionTimeout);
+      console.error('Session check failed:', err);
+      setLoading(false);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
@@ -140,18 +162,18 @@ const HabitTracker = () => {
       setLoading(false);
     });
 
-    return () => subscription.unsubscribe();
+    return () => {
+      clearTimeout(sessionTimeout);
+      subscription.unsubscribe();
+    };
   }, [fetchHabits]);
 
-  // Real-time subscription disabled to prevent WebSocket errors
-  // The app works fine without realtime - habits update on page refresh/actions
-  // If you want to re-enable realtime, uncomment the code below and enable it in Supabase dashboard
-  /*
+  // Real-time subscription for live sync across browser instances
   useEffect(() => {
     if (!user) return;
 
     let channel;
-    
+
     try {
       channel = supabase
         .channel('habits-changes')
@@ -165,7 +187,11 @@ const HabitTracker = () => {
           },
           (payload) => {
             if (payload.eventType === 'INSERT') {
-              setHabits(prev => [...prev, payload.new]);
+              setHabits(prev => {
+                // Avoid duplicates
+                if (prev.some(h => h.id === payload.new.id)) return prev;
+                return [...prev, payload.new];
+              });
             } else if (payload.eventType === 'UPDATE') {
               setHabits(prev => prev.map(h => h.id === payload.new.id ? payload.new : h));
             } else if (payload.eventType === 'DELETE') {
@@ -175,19 +201,13 @@ const HabitTracker = () => {
         )
         .subscribe((status) => {
           if (status === 'SUBSCRIBED') {
-            if (import.meta.env.DEV) {
-              console.log('✅ Realtime subscription active');
-            }
+            console.log('realtime: connected');
           } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            if (import.meta.env.DEV) {
-              console.warn('⚠️ Realtime subscription failed');
-            }
+            console.warn('realtime: connection failed (app will still work, refresh to sync)');
           }
         });
     } catch (error) {
-      if (import.meta.env.DEV) {
-        console.warn('⚠️ Could not establish realtime connection:', error.message);
-      }
+      console.warn('realtime: could not connect -', error.message);
     }
 
     return () => {
@@ -200,7 +220,6 @@ const HabitTracker = () => {
       }
     };
   }, [user]);
-  */
 
   useEffect(() => {
     const blinkInterval = setInterval(() => {
@@ -1160,9 +1179,33 @@ const HabitTracker = () => {
             }}>
               loading habits...
             </div>
+          ) : fetchError ? (
+            <div style={{
+              padding: '40px 12px',
+              textAlign: 'center',
+              color: '#ff4141',
+              fontSize: '12px'
+            }}>
+              error: {fetchError}
+              <br />
+              <button
+                onClick={() => user && fetchHabits(user.id).then(setHabits)}
+                style={{
+                  marginTop: '12px',
+                  background: 'transparent',
+                  border: '1px solid #ff4141',
+                  color: '#ff4141',
+                  padding: '4px 12px',
+                  cursor: 'pointer',
+                  fontSize: '11px'
+                }}
+              >
+                retry
+              </button>
+            </div>
           ) : habits.length === 0 ? (
-            <div style={{ 
-              padding: '40px 12px', 
+            <div style={{
+              padding: '40px 12px',
               textAlign: 'center',
               color: '#444',
               fontSize: '12px'
