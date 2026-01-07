@@ -1255,7 +1255,7 @@ const HabitTracker = () => {
  ██║  ██║██║  ██║██████╔╝██║   ██║   ╚██████╔╝
  ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝    ╚═════╝`}
             </pre>
-            <span style={{ color: '#666', fontSize: '12px', marginLeft: '2px' }}>.space</span>
+            <span style={{ color: '#888', fontSize: '12px', marginLeft: '2px' }}>.space</span>
           </div>
 
           <div style={{
@@ -1309,7 +1309,7 @@ const HabitTracker = () => {
             </div>
 
             <div style={{
-              color: '#666',
+              color: '#888',
               fontSize: '11px',
               marginBottom: '20px',
               lineHeight: '1.6'
@@ -1402,7 +1402,7 @@ const HabitTracker = () => {
                   padding: '10px',
                   backgroundColor: 'transparent',
                   border: '1px solid #333',
-                  color: '#666',
+                  color: '#888',
                   cursor: authLoading ? 'wait' : 'pointer',
                   fontFamily: 'inherit',
                   fontSize: '11px',
@@ -1415,7 +1415,7 @@ const HabitTracker = () => {
                 }}
                 onMouseLeave={e => {
                   e.target.style.borderColor = '#333';
-                  e.target.style.color = '#666';
+                  e.target.style.color = '#888';
                 }}
               >
                 set/reset password
@@ -1517,7 +1517,7 @@ const HabitTracker = () => {
  ██║  ██║██║  ██║██████╔╝██║   ██║   ╚██████╔╝
  ╚═╝  ╚═╝╚═╝  ╚═╝╚═════╝ ╚═╝   ╚═╝    ╚═════╝`}
               </pre>
-              <span style={{ color: '#666', fontSize: isMobile ? '8px' : '12px', marginLeft: '2px' }}>.space</span>
+              <span style={{ color: '#888', fontSize: isMobile ? '8px' : '12px', marginLeft: '2px' }}>.space</span>
             </div>
 
             {/* Mobile: More menu button in header */}
@@ -1631,7 +1631,7 @@ const HabitTracker = () => {
             alignItems: 'center',
             fontSize: isMobile ? '10px' : '12px'
           }}>
-            <span style={{ color: '#666' }}>
+            <span style={{ color: '#888' }}>
               {new Date().toLocaleDateString('en-US', {
                 weekday: isMobile ? 'short' : 'long',
                 month: 'short',
@@ -1651,7 +1651,7 @@ const HabitTracker = () => {
                     style={{
                       background: 'transparent',
                       border: '1px solid #333',
-                      color: '#666',
+                      color: '#888',
                       padding: '4px 8px',
                       cursor: 'pointer',
                       fontFamily: 'inherit',
@@ -1664,7 +1664,7 @@ const HabitTracker = () => {
                     }}
                     onMouseLeave={(e) => {
                       e.target.style.borderColor = '#333';
-                      e.target.style.color = '#666';
+                      e.target.style.color = '#888';
                     }}
                   >
                     [SETTINGS]
@@ -1678,7 +1678,7 @@ const HabitTracker = () => {
                     style={{
                       background: 'transparent',
                       border: '1px solid #333',
-                      color: '#666',
+                      color: '#888',
                       padding: '4px 8px',
                       cursor: 'pointer',
                       fontFamily: 'inherit',
@@ -1691,7 +1691,7 @@ const HabitTracker = () => {
                     }}
                     onMouseLeave={(e) => {
                       e.target.style.borderColor = '#333';
-                      e.target.style.color = '#666';
+                      e.target.style.color = '#888';
                     }}
                   >
                     [LOGOUT]
@@ -1715,7 +1715,7 @@ const HabitTracker = () => {
             borderBottom: '1px solid #333',
             padding: '8px 12px',
             fontSize: isMobile ? '10px' : '11px',
-            color: '#666',
+            color: '#888',
             display: 'flex',
             justifyContent: 'space-between'
           }}>
@@ -1845,7 +1845,7 @@ const HabitTracker = () => {
             borderBottom: '1px solid #333',
             padding: '8px 12px',
             fontSize: '11px',
-            color: '#666',
+            color: '#888',
             display: 'grid',
             gridTemplateColumns: isMobile
               ? '24px 1fr 32px 50px'
@@ -1896,7 +1896,7 @@ const HabitTracker = () => {
             <div style={{
               padding: '40px 12px',
               textAlign: 'center',
-              color: '#444',
+              color: '#666',
               fontSize: '12px'
             }}>
               {habits.length === 0 ? 'no habits tracked. add one below.' : 'no habits existed on this date.'}
@@ -1915,13 +1915,13 @@ const HabitTracker = () => {
                     backgroundColor: 'rgba(0,255,65,0.05)',
                     borderBottom: '1px solid #222',
                     fontSize: '12px',
-                    color: '#666',
+                    color: '#888',
                     cursor: 'pointer',
                     animation: 'fadeIn 0.3s ease-out'
                   }}
                 >
                   <span><span style={{ color: '#00ff41' }}>→</span> complete</span>
-                  <span style={{ color: '#444', fontSize: '10px' }}>[dismiss]</span>
+                  <span style={{ color: '#666', fontSize: '10px' }}>[dismiss]</span>
                   <span>options <span style={{ color: '#ff4444' }}>←</span></span>
                 </div>
               )}
@@ -2016,10 +2016,10 @@ const HabitTracker = () => {
                     >
                       {/* Icon (matching desktop style) */}
                       <span style={{
-                        fontSize: '16px',
-                        color: isHabitCompleted(habit) ? '#00ff41' : '#444',
+                        fontSize: '18px',
+                        color: isHabitCompleted(habit) ? '#00ff41' : '#666',
                         textShadow: isHabitCompleted(habit) ? '0 0 8px #00ff41' : 'none',
-                        width: '24px',
+                        width: '28px',
                         textAlign: 'center',
                         flexShrink: 0
                       }}>
@@ -2035,8 +2035,8 @@ const HabitTracker = () => {
                         overflow: 'hidden'
                       }}>
                         <span style={{
-                          color: isHabitCompleted(habit) ? '#00ff41' : '#888',
-                          fontSize: '13px',
+                          color: isHabitCompleted(habit) ? '#00ff41' : '#999',
+                          fontSize: '15px',
                           overflow: 'hidden',
                           textOverflow: 'ellipsis',
                           whiteSpace: 'nowrap'
@@ -2045,10 +2045,10 @@ const HabitTracker = () => {
                         </span>
                         {formatScheduledTime(habit.scheduled_time) && (
                           <span style={{
-                            fontSize: '9px',
-                            color: '#555',
+                            fontSize: '10px',
+                            color: '#777',
                             background: 'rgba(255,255,255,0.05)',
-                            padding: '2px 4px',
+                            padding: '2px 5px',
                             borderRadius: '3px',
                             flexShrink: 0
                           }}>
@@ -2058,13 +2058,13 @@ const HabitTracker = () => {
                       </div>
 
                       {/* Progress dots (matching desktop style) */}
-                      <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
+                      <div style={{ display: 'flex', gap: '4px', flexShrink: 0 }}>
                         {Array.from({ length: habit.daily_goal || 1 }).map((_, i) => (
                           <span
                             key={i}
                             style={{
-                              fontSize: '10px',
-                              color: i < getHabitCompletions(habit) ? '#00ff41' : '#555',
+                              fontSize: '12px',
+                              color: i < getHabitCompletions(habit) ? '#00ff41' : '#666',
                               textShadow: i < getHabitCompletions(habit) ? '0 0 4px #00ff41' : 'none'
                             }}
                           >
@@ -2075,9 +2075,9 @@ const HabitTracker = () => {
 
                       {/* Streak */}
                       <span style={{
-                        color: habit.streak > 7 ? '#00ff41' : habit.streak > 3 ? '#ffaa00' : '#666',
-                        fontSize: '12px',
-                        minWidth: '45px',
+                        color: habit.streak > 7 ? '#00ff41' : habit.streak > 3 ? '#ffaa00' : '#888',
+                        fontSize: '14px',
+                        minWidth: '50px',
                         textAlign: 'right',
                         flexShrink: 0
                       }}>
@@ -2175,7 +2175,7 @@ const HabitTracker = () => {
                       {/* Icon */}
                       <span style={{
                         fontSize: '16px',
-                        color: isHabitCompleted(habit) ? '#00ff41' : '#444',
+                        color: isHabitCompleted(habit) ? '#00ff41' : '#666',
                         textShadow: isHabitCompleted(habit) ? '0 0 8px #00ff41' : 'none',
                         opacity: isHabitScheduledToday(habit) ? 1 : 0.35
                       }}>
@@ -2190,7 +2190,7 @@ const HabitTracker = () => {
                         opacity: isHabitScheduledToday(habit) ? 1 : 0.35
                       }}>
                         <span style={{
-                          color: isHabitCompleted(habit) ? '#00ff41' : '#888',
+                          color: isHabitCompleted(habit) ? '#00ff41' : '#999',
                           fontSize: '13px'
                         }}>
                           {habit.name}
@@ -2198,7 +2198,7 @@ const HabitTracker = () => {
                         {formatScheduledTime(habit.scheduled_time) && (
                           <span style={{
                             fontSize: '10px',
-                            color: '#555',
+                            color: '#777',
                             backgroundColor: 'rgba(255,255,255,0.05)',
                             padding: '2px 5px',
                             borderRadius: '3px'
@@ -2220,7 +2220,7 @@ const HabitTracker = () => {
                             key={i}
                             style={{
                               fontSize: '10px',
-                              color: i < getHabitCompletions(habit) ? '#00ff41' : '#555',
+                              color: i < getHabitCompletions(habit) ? '#00ff41' : '#666',
                               textShadow: i < getHabitCompletions(habit) ? '0 0 4px #00ff41' : 'none'
                             }}
                           >
@@ -2231,7 +2231,7 @@ const HabitTracker = () => {
 
                       {/* Streak */}
                       <span style={{
-                        color: habit.streak > 7 ? '#00ff41' : habit.streak > 3 ? '#ffaa00' : '#666',
+                        color: habit.streak > 7 ? '#00ff41' : habit.streak > 3 ? '#ffaa00' : '#888',
                         fontSize: '12px',
                         textAlign: 'right',
                         opacity: isHabitScheduledToday(habit) ? 1 : 0.35
@@ -2260,7 +2260,7 @@ const HabitTracker = () => {
                             touchAction: 'none'
                           }}
                           onMouseEnter={e => e.target.style.color = '#00ff41'}
-                          onMouseLeave={e => { if (openMenuId !== habit.id && !isDragging) e.target.style.color = '#666'; }}
+                          onMouseLeave={e => { if (openMenuId !== habit.id && !isDragging) e.target.style.color = '#888'; }}
                           title="Menu"
                         >
                           ⋮
@@ -2424,7 +2424,7 @@ const HabitTracker = () => {
             padding: '12px',
             backgroundColor: 'transparent',
             border: '1px dashed #333',
-            color: '#666',
+            color: '#888',
             cursor: 'pointer',
             fontFamily: 'inherit',
             fontSize: '12px',
@@ -2437,7 +2437,7 @@ const HabitTracker = () => {
           }}
           onMouseLeave={e => {
             e.target.style.borderColor = '#333';
-            e.target.style.color = '#666';
+            e.target.style.color = '#888';
           }}
         >
           + ADD NEW HABIT
@@ -2484,7 +2484,7 @@ const HabitTracker = () => {
               </div>
               
               <div style={{
-                color: '#666',
+                color: '#888',
                 fontSize: '11px',
                 marginBottom: '20px',
                 lineHeight: '1.6'
@@ -2559,7 +2559,7 @@ const HabitTracker = () => {
                     padding: '10px',
                     backgroundColor: 'transparent',
                     border: '1px solid #444',
-                    color: '#666',
+                    color: '#888',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     fontSize: '11px',
@@ -2614,14 +2614,14 @@ const HabitTracker = () => {
                   style={{
                     background: 'transparent',
                     border: 'none',
-                    color: '#666',
+                    color: '#888',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     fontSize: '16px',
                     padding: '0 8px'
                   }}
                   onMouseEnter={(e) => e.target.style.color = '#ff4444'}
-                  onMouseLeave={(e) => e.target.style.color = '#666'}
+                  onMouseLeave={(e) => e.target.style.color = '#888'}
                 >
                   ×
                 </button>
@@ -2634,7 +2634,7 @@ const HabitTracker = () => {
                 marginBottom: '20px',
                 backgroundColor: '#0a0a0a'
               }}>
-                <div style={{ color: '#666', fontSize: '10px', marginBottom: '8px' }}>EMAIL</div>
+                <div style={{ color: '#888', fontSize: '10px', marginBottom: '8px' }}>EMAIL</div>
                 <div style={{ color: '#fff', fontSize: '13px' }}>{user?.email || 'N/A'}</div>
               </div>
 
@@ -2813,7 +2813,7 @@ const HabitTracker = () => {
                   onKeyDown={(e) => e.key === 'Enter' && addHabit()}
                 />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: '#666', fontSize: '11px' }}>×</span>
+                  <span style={{ color: '#888', fontSize: '11px' }}>×</span>
                   <input
                     type="number"
                     min="1"
@@ -2837,7 +2837,7 @@ const HabitTracker = () => {
 
               {/* Time field with toggle */}
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ color: '#666', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
+                <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
                   TIME
                 </div>
                 <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px' }}>
@@ -2880,7 +2880,7 @@ const HabitTracker = () => {
                       style={{
                         background: !newHabitTime ? 'rgba(255,255,255,0.1)' : 'transparent',
                         border: `1px solid ${!newHabitTime ? '#666' : '#444'}`,
-                        color: !newHabitTime ? '#888' : '#555',
+                        color: !newHabitTime ? '#888' : '#666',
                         padding: '3px 8px',
                         cursor: 'pointer',
                         fontFamily: 'inherit',
@@ -2897,7 +2897,7 @@ const HabitTracker = () => {
 
               {/* Days selector */}
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ color: '#666', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
+                <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
                   DAYS
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
@@ -2963,7 +2963,7 @@ const HabitTracker = () => {
                     padding: '10px',
                     backgroundColor: 'transparent',
                     border: '1px solid #444',
-                    color: '#666',
+                    color: '#888',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     fontSize: '11px',
@@ -3027,7 +3027,7 @@ const HabitTracker = () => {
                   onKeyDown={(e) => e.key === 'Enter' && updateHabit()}
                 />
                 <div style={{ display: 'flex', alignItems: 'center', gap: '6px' }}>
-                  <span style={{ color: '#666', fontSize: '11px' }}>×</span>
+                  <span style={{ color: '#888', fontSize: '11px' }}>×</span>
                   <input
                     type="number"
                     min="1"
@@ -3051,7 +3051,7 @@ const HabitTracker = () => {
 
               {/* Time field with toggle */}
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ color: '#666', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
+                <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
                   TIME
                 </div>
                 <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px' }}>
@@ -3094,7 +3094,7 @@ const HabitTracker = () => {
                       style={{
                         background: !editHabitTime ? 'rgba(255,255,255,0.1)' : 'transparent',
                         border: `1px solid ${!editHabitTime ? '#666' : '#444'}`,
-                        color: !editHabitTime ? '#888' : '#555',
+                        color: !editHabitTime ? '#888' : '#666',
                         padding: '3px 8px',
                         cursor: 'pointer',
                         fontFamily: 'inherit',
@@ -3111,7 +3111,7 @@ const HabitTracker = () => {
 
               {/* Days selector */}
               <div style={{ marginBottom: '16px' }}>
-                <div style={{ color: '#666', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
+                <div style={{ color: '#888', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
                   DAYS
                 </div>
                 <div style={{ display: 'flex', gap: '4px' }}>
@@ -3177,7 +3177,7 @@ const HabitTracker = () => {
                     padding: '10px',
                     backgroundColor: 'transparent',
                     border: '1px solid #444',
-                    color: '#666',
+                    color: '#888',
                     cursor: 'pointer',
                     fontFamily: 'inherit',
                     fontSize: '11px',
