@@ -19,6 +19,12 @@ const HabitTracker = () => {
   const [showAddModal, setShowAddModal] = useState(false);
   const [newHabitName, setNewHabitName] = useState('');
   const [selectedView, setSelectedView] = useState('today');
+  const [selectedDate, setSelectedDate] = useState(() => {
+    const now = new Date();
+    return `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+  });
+  const [dateCompletions, setDateCompletions] = useState({});
+  const [loadingDate, setLoadingDate] = useState(false);
   const [cursorBlink, setCursorBlink] = useState(true);
   const [bootSequence, setBootSequence] = useState(true);
   const [bootLine, setBootLine] = useState(0);
@@ -217,6 +223,89 @@ const HabitTracker = () => {
     }
   }, [habits, user]);
 
+  // Sync today's completions to completions table and recalculate streaks on load
+  const [streaksRecalculated, setStreaksRecalculated] = useState(false);
+  useEffect(() => {
+    if (!user || habits.length === 0 || streaksRecalculated || loading) return;
+
+    const syncAndRecalculateStreaks = async () => {
+      const now = new Date();
+      const todayStr = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+
+      // First, sync today's completions from habits table to completions table
+      for (const habit of habits) {
+        if (habit.completions_today > 0) {
+          await supabase.from('completions').upsert({
+            user_id: user.id,
+            habit_id: habit.id,
+            completed_date: todayStr,
+            completion_count: habit.completions_today,
+            daily_goal: habit.daily_goal || 1
+          }, { onConflict: 'habit_id,completed_date' });
+        }
+      }
+
+      // Then recalculate all streaks
+      const updatedHabits = await Promise.all(
+        habits.map(async (habit) => {
+          const newStreak = await calculateStreakForHabit(habit.id, habit.daily_goal || 1);
+          return { ...habit, streak: newStreak };
+        })
+      );
+
+      // Only update if streaks changed
+      const streaksChanged = updatedHabits.some((h, i) => h.streak !== habits[i].streak);
+      if (streaksChanged) {
+        setHabits(updatedHabits);
+        // Update database
+        for (const habit of updatedHabits) {
+          if (habit.streak !== habits.find(h => h.id === habit.id)?.streak) {
+            await supabase.from('habits').update({ streak: habit.streak }).eq('id', habit.id);
+          }
+        }
+      }
+      setStreaksRecalculated(true);
+    };
+
+    syncAndRecalculateStreaks();
+  }, [user, habits.length, streaksRecalculated, loading]);
+
+  // Separate function to calculate streak (used by effect above)
+  const calculateStreakForHabit = async (habitId, dailyGoal) => {
+    if (!user) return 0;
+
+    const { data: completions, error } = await supabase
+      .from('completions')
+      .select('completed_date, completion_count, daily_goal')
+      .eq('user_id', user.id)
+      .eq('habit_id', habitId)
+      .order('completed_date', { ascending: false });
+
+    if (error || !completions) return 0;
+
+    const completedDates = new Set(
+      completions
+        .filter(c => c.completion_count >= (c.daily_goal || dailyGoal))
+        .map(c => c.completed_date)
+    );
+
+    let streak = 0;
+    const checkDate = new Date();
+    const getDateStr = (d) => `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+
+    while (true) {
+      const dateStr = getDateStr(checkDate);
+      if (completedDates.has(dateStr)) {
+        streak++;
+        checkDate.setDate(checkDate.getDate() - 1);
+      } else {
+        break;
+      }
+    }
+
+    return streak;
+  };
+
   useEffect(() => {
     const blinkInterval = setInterval(() => {
       setCursorBlink(prev => !prev);
@@ -250,7 +339,98 @@ const HabitTracker = () => {
   const isUpdatingPassword = useRef(false);
 
   // Hook for recording completions to activity tracking table
-  const { recordCompletion } = useCompletions(user?.id);
+  const { recordCompletion, getCompletionsForDate } = useCompletions(user?.id);
+
+  // Date navigation helpers - use local date to avoid timezone issues
+  const getLocalDateString = (date = new Date()) => {
+    const year = date.getFullYear();
+    const month = String(date.getMonth() + 1).padStart(2, '0');
+    const day = String(date.getDate()).padStart(2, '0');
+    return `${year}-${month}-${day}`;
+  };
+
+  const today = getLocalDateString();
+  const isToday = selectedDate === today;
+
+  const formatDateLabel = (dateStr) => {
+    if (dateStr === today) return 'today';
+    const [year, month, day] = dateStr.split('-').map(Number);
+    const date = new Date(year, month - 1, day);
+    return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
+  };
+
+  // Calculate the earliest date user can navigate to (oldest habit creation)
+  const earliestDate = habits.length > 0
+    ? getLocalDateString(new Date(Math.min(...habits.map(h => new Date(h.created_at).getTime()))))
+    : today;
+
+  const canGoBack = selectedDate > earliestDate;
+
+  const navigateDate = (direction) => {
+    const [year, month, day] = selectedDate.split('-').map(Number);
+    const current = new Date(year, month - 1, day);
+    current.setDate(current.getDate() + direction);
+    const newDate = getLocalDateString(current);
+    // Don't allow future dates or before earliest habit
+    if (newDate <= today && newDate >= earliestDate) {
+      setSelectedDate(newDate);
+    }
+  };
+
+  // Filter habits to only show ones that existed on the selected date
+  const habitsForSelectedDate = habits.filter(h => {
+    const habitCreatedDate = getLocalDateString(new Date(h.created_at));
+    return habitCreatedDate <= selectedDate;
+  });
+
+  // Load completions when viewing a past date
+  useEffect(() => {
+    // Clear immediately to prevent stale data
+    setDateCompletions({});
+    setLoadingDate(false);
+
+    if (!user || isToday) {
+      return;
+    }
+
+    let cancelled = false;
+    setLoadingDate(true);
+
+    getCompletionsForDate(selectedDate)
+      .then(completions => {
+        if (cancelled) return;
+        const completionsMap = {};
+        (completions || []).forEach(c => {
+          completionsMap[c.habit_id] = {
+            completion_count: c.completion_count,
+            daily_goal: c.daily_goal
+          };
+        });
+        setDateCompletions(completionsMap);
+      })
+      .catch(err => {
+        console.error('Error loading completions:', err);
+      })
+      .finally(() => {
+        setLoadingDate(false);
+      });
+
+    return () => { cancelled = true; };
+  }, [selectedDate, user, isToday, getCompletionsForDate]);
+
+  // Get completions count for a habit on the selected date
+  const getHabitCompletions = (habit) => {
+    if (isToday) {
+      return habit.completions_today || 0;
+    }
+    return dateCompletions[habit.id]?.completion_count || 0;
+  };
+
+  // Check if habit is completed for the selected date
+  const isHabitCompleted = (habit) => {
+    return getHabitCompletions(habit) >= (habit.daily_goal || 1);
+  };
+
 
   const signInWithPassword = async () => {
     if (!email.trim() || !password.trim()) return;
@@ -562,6 +742,39 @@ const HabitTracker = () => {
     if (!habit) return;
 
     const dailyGoal = habit.daily_goal || 1;
+
+    // Handle past date completions differently
+    if (!isToday) {
+      const currentCompletions = dateCompletions[id]?.completion_count || 0;
+      const newCompletions = (currentCompletions + 1) % (dailyGoal + 1);
+
+      // Optimistic update for past date
+      setDateCompletions(prev => ({
+        ...prev,
+        [id]: { completion_count: newCompletions, daily_goal: dailyGoal }
+      }));
+
+      setSyncing(true);
+      await recordCompletion(id, newCompletions, dailyGoal, selectedDate);
+
+      // Recalculate streak based on all completions
+      const newStreak = await calculateStreakForHabit(id, dailyGoal);
+
+      // Update the habit's streak in state and database
+      setHabits(prev => prev.map(h =>
+        h.id === id ? { ...h, streak: newStreak } : h
+      ));
+
+      await supabase
+        .from('habits')
+        .update({ streak: newStreak })
+        .eq('id', id);
+
+      setSyncing(false);
+      return;
+    }
+
+    // Today's logic (existing behavior)
     const currentCompletions = habit.completions_today || 0;
     const newCompletions = (currentCompletions + 1) % (dailyGoal + 1);
     const wasCompleted = habit.completed_today;
@@ -760,14 +973,14 @@ const HabitTracker = () => {
     setShowMobileHint(false);
   };
 
-  const completedCount = habits.filter(h => h.completed_today).length;
+  const completedCount = habitsForSelectedDate.filter(h => getHabitCompletions(h) >= (h.daily_goal || 1)).length;
   // Calculate progress including partial completions on multi-goal habits
-  const totalProgress = habits.reduce((sum, h) => {
+  const totalProgress = habitsForSelectedDate.reduce((sum, h) => {
     const goal = h.daily_goal || 1;
-    const completions = h.completions_today || 0;
+    const completions = getHabitCompletions(h);
     return sum + Math.min(completions / goal, 1);
   }, 0);
-  const completionPercent = habits.length > 0 ? Math.round((totalProgress / habits.length) * 100) : 0;
+  const completionPercent = habitsForSelectedDate.length > 0 ? Math.round((totalProgress / habitsForSelectedDate.length) * 100) : 0;
 
   const generateProgressBar = (percent, width = 20) => {
     const filled = Math.round((percent / 100) * width);
@@ -1388,12 +1601,16 @@ const HabitTracker = () => {
           display: 'flex',
           gap: '4px',
           marginBottom: '16px',
-          fontSize: isMobile ? '10px' : '11px'
+          fontSize: isMobile ? '10px' : '11px',
+          alignItems: 'center'
         }}>
           {['today', 'activity'].map(view => (
             <button
               key={view}
-              onClick={() => setSelectedView(view)}
+              onClick={() => {
+                setSelectedView(view);
+                if (view === 'today') setSelectedDate(today);
+              }}
               style={{
                 background: selectedView === view ? '#1a1a1a' : 'transparent',
                 border: '1px solid #333',
@@ -1407,9 +1624,41 @@ const HabitTracker = () => {
                 marginBottom: '-1px'
               }}
             >
-              [{view}]
+              [{view === 'today' ? formatDateLabel(selectedDate) : view}]
             </button>
           ))}
+          <div style={{ marginLeft: 'auto', display: 'flex', gap: '4px' }}>
+            <button
+              onClick={() => navigateDate(-1)}
+              disabled={!canGoBack}
+              style={{
+                background: 'transparent',
+                border: '1px solid #333',
+                color: canGoBack ? '#666' : '#333',
+                padding: isMobile ? '8px 10px' : '8px 12px',
+                cursor: canGoBack ? 'pointer' : 'not-allowed',
+                fontFamily: 'inherit'
+              }}
+              title="Previous day"
+            >
+              ←
+            </button>
+            <button
+              onClick={() => navigateDate(1)}
+              disabled={isToday}
+              style={{
+                background: 'transparent',
+                border: '1px solid #333',
+                color: isToday ? '#333' : '#666',
+                padding: isMobile ? '8px 10px' : '8px 12px',
+                cursor: isToday ? 'not-allowed' : 'pointer',
+                fontFamily: 'inherit'
+              }}
+              title="Next day"
+            >
+              →
+            </button>
+          </div>
         </div>
 
         {/* Habits List - Only show on Today view */}
@@ -1437,14 +1686,14 @@ const HabitTracker = () => {
             {!isMobile && <span></span>}
           </div>
 
-          {loading ? (
-            <div style={{ 
-              padding: '40px 12px', 
+          {loading || loadingDate ? (
+            <div style={{
+              padding: '40px 12px',
               textAlign: 'center',
               color: '#00ff41',
               fontSize: '12px'
             }}>
-              loading habits...
+              {loadingDate ? `loading ${formatDateLabel(selectedDate)}...` : 'loading habits...'}
             </div>
           ) : fetchError ? (
             <div style={{
@@ -1470,19 +1719,19 @@ const HabitTracker = () => {
                 retry
               </button>
             </div>
-          ) : habits.length === 0 ? (
+          ) : habitsForSelectedDate.length === 0 ? (
             <div style={{
               padding: '40px 12px',
               textAlign: 'center',
               color: '#444',
               fontSize: '12px'
             }}>
-              no habits tracked. add one below.
+              {habits.length === 0 ? 'no habits tracked. add one below.' : 'no habits existed on this date.'}
             </div>
           ) : (
             <>
               {/* Mobile swipe hint */}
-              {isMobile && showMobileHint && habits.length > 0 && (
+              {isMobile && showMobileHint && habitsForSelectedDate.length > 0 && (
                 <div
                   onClick={dismissMobileHint}
                   style={{
@@ -1503,13 +1752,13 @@ const HabitTracker = () => {
                   <span>options <span style={{ color: '#ff4444' }}>←</span></span>
                 </div>
               )}
-              {habits.map((habit, index) => (
+              {habitsForSelectedDate.map((habit, index) => (
               <div
                 key={habit.id}
                 style={{
                   position: 'relative',
                   overflow: 'hidden',
-                  borderBottom: index < habits.length - 1 ? '1px solid #222' : 'none'
+                  borderBottom: index < habitsForSelectedDate.length - 1 ? '1px solid #222' : 'none'
                 }}
               >
                 {isMobile ? (
@@ -1571,7 +1820,7 @@ const HabitTracker = () => {
                         transition: activeSwipe === habit.id ? 'none' : 'transform 0.25s cubic-bezier(0.25, 0.46, 0.45, 0.94)',
                         backgroundColor: completedAnimation === habit.id
                           ? 'rgba(0,255,65,0.15)'
-                          : habit.completed_today
+                          : isHabitCompleted(habit)
                             ? 'rgba(0,255,65,0.03)'
                             : '#0a0a0a',
                         cursor: 'pointer',
@@ -1584,8 +1833,8 @@ const HabitTracker = () => {
                       {/* Icon (matching desktop style) */}
                       <span style={{
                         fontSize: '16px',
-                        color: habit.completed_today ? '#00ff41' : '#444',
-                        textShadow: habit.completed_today ? '0 0 8px #00ff41' : 'none',
+                        color: isHabitCompleted(habit) ? '#00ff41' : '#444',
+                        textShadow: isHabitCompleted(habit) ? '0 0 8px #00ff41' : 'none',
                         width: '24px',
                         textAlign: 'center',
                         flexShrink: 0
@@ -1596,7 +1845,7 @@ const HabitTracker = () => {
                       {/* Habit name */}
                       <span style={{
                         flex: 1,
-                        color: habit.completed_today ? '#00ff41' : '#888',
+                        color: isHabitCompleted(habit) ? '#00ff41' : '#888',
                         fontSize: '13px',
                         overflow: 'hidden',
                         textOverflow: 'ellipsis',
@@ -1612,11 +1861,11 @@ const HabitTracker = () => {
                             key={i}
                             style={{
                               fontSize: '10px',
-                              color: i < (habit.completions_today || 0) ? '#00ff41' : '#555',
-                              textShadow: i < (habit.completions_today || 0) ? '0 0 4px #00ff41' : 'none'
+                              color: i < getHabitCompletions(habit) ? '#00ff41' : '#555',
+                              textShadow: i < getHabitCompletions(habit) ? '0 0 4px #00ff41' : 'none'
                             }}
                           >
-                            {i < (habit.completions_today || 0) ? '●' : '○'}
+                            {i < getHabitCompletions(habit) ? '●' : '○'}
                           </span>
                         ))}
                       </div>
@@ -1708,20 +1957,20 @@ const HabitTracker = () => {
                     gap: '8px',
                     alignItems: 'center',
                     padding: '12px',
-                    backgroundColor: habit.completed_today ? 'rgba(0,255,65,0.03)' : 'transparent',
+                    backgroundColor: isHabitCompleted(habit) ? 'rgba(0,255,65,0.03)' : 'transparent',
                     transition: 'background 0.15s'
                   }}>
                     <span style={{
                       fontSize: '16px',
-                      color: habit.completed_today ? '#00ff41' : '#444',
-                      textShadow: habit.completed_today ? '0 0 8px #00ff41' : 'none'
+                      color: isHabitCompleted(habit) ? '#00ff41' : '#444',
+                      textShadow: isHabitCompleted(habit) ? '0 0 8px #00ff41' : 'none'
                     }}>
                       {habit.icon}
                     </span>
 
                     <div>
                       <span style={{
-                        color: habit.completed_today ? '#00ff41' : '#888',
+                        color: isHabitCompleted(habit) ? '#00ff41' : '#888',
                         fontSize: '13px'
                       }}>
                         {habit.name}
@@ -1734,11 +1983,11 @@ const HabitTracker = () => {
                           key={i}
                           style={{
                             fontSize: '10px',
-                            color: i < (habit.completions_today || 0) ? '#00ff41' : '#555',
-                            textShadow: i < (habit.completions_today || 0) ? '0 0 4px #00ff41' : 'none'
+                            color: i < getHabitCompletions(habit) ? '#00ff41' : '#555',
+                            textShadow: i < getHabitCompletions(habit) ? '0 0 4px #00ff41' : 'none'
                           }}
                         >
-                          {i < (habit.completions_today || 0) ? '●' : '○'}
+                          {i < getHabitCompletions(habit) ? '●' : '○'}
                         </span>
                       ))}
                     </div>
@@ -1774,8 +2023,8 @@ const HabitTracker = () => {
                         onClick={() => incrementHabit(habit.id)}
                         style={{
                           background: 'transparent',
-                          border: `1px solid ${habit.completed_today ? '#00ff41' : '#444'}`,
-                          color: habit.completed_today ? '#00ff41' : '#666',
+                          border: `1px solid ${isHabitCompleted(habit) ? '#00ff41' : '#444'}`,
+                          color: isHabitCompleted(habit) ? '#00ff41' : '#666',
                           padding: '4px 8px',
                           cursor: 'pointer',
                           fontFamily: 'inherit',
@@ -1783,7 +2032,7 @@ const HabitTracker = () => {
                           transition: 'all 0.15s'
                         }}
                       >
-                        {habit.completed_today ? '[DONE]' : '[    ]'}
+                        {isHabitCompleted(habit) ? '[DONE]' : '[    ]'}
                       </button>
                     )}
 

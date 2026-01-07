@@ -9,12 +9,15 @@ export const useCompletions = (userId) => {
    * Record or update a completion for today
    * Uses upsert to handle both new and existing records
    */
-  const recordCompletion = useCallback(async (habitId, completionCount, dailyGoal) => {
+  const recordCompletion = useCallback(async (habitId, completionCount, dailyGoal, date = null) => {
     if (!userId || !habitId || dailyGoal <= 0) {
       return { success: false, error: 'Missing userId, habitId, or invalid dailyGoal' };
     }
 
-    const today = new Date().toISOString().split('T')[0];
+    // Use local date to avoid timezone issues
+    const now = new Date();
+    const localToday = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}-${String(now.getDate()).padStart(2, '0')}`;
+    const targetDate = date || localToday;
 
     try {
       if (completionCount === 0) {
@@ -24,7 +27,7 @@ export const useCompletions = (userId) => {
           .delete()
           .eq('user_id', userId)
           .eq('habit_id', habitId)
-          .eq('completed_date', today);
+          .eq('completed_date', targetDate);
 
         if (error) throw error;
       } else {
@@ -34,7 +37,7 @@ export const useCompletions = (userId) => {
           .upsert({
             user_id: userId,
             habit_id: habitId,
-            completed_date: today,
+            completed_date: targetDate,
             completion_count: completionCount,
             daily_goal: dailyGoal
           }, {
