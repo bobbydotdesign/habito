@@ -31,7 +31,7 @@ const SortableItem = ({ id, children, disabled }) => {
   );
 };
 
-const HABITS_CACHE_KEY = 'habito_habits_cache';
+const HABITS_CACHE_KEY = 'habito_habits_cache_v2'; // v2: invalidate old cache with zeroed streaks
 
 const HabitTracker = () => {
   // Load cached habits immediately for faster perceived load
@@ -314,8 +314,29 @@ const HabitTracker = () => {
       const updatedHabits = await Promise.all(
         habits.map(async (habit) => {
           const newStreak = await calculateStreakForHabit(habit.id, habit.daily_goal || 1);
-          // If null returned, keep existing streak (no completion data to calculate from)
-          return { ...habit, streak: newStreak !== null ? newStreak : habit.streak };
+
+          // If we got a calculated streak, use it
+          if (newStreak !== null) {
+            return { ...habit, streak: newStreak };
+          }
+
+          // If existing streak exists, keep it
+          if (habit.streak > 0) {
+            return habit;
+          }
+
+          // Try to restore from history array (fallback for lost streaks)
+          const history = habit.history || [];
+          let restoredStreak = 0;
+          // Count consecutive 1s from the end of history
+          for (let i = history.length - 1; i >= 0; i--) {
+            if (history[i] === 1) restoredStreak++;
+            else break;
+          }
+          // Add today if completed
+          if (habit.completed_today) restoredStreak++;
+
+          return { ...habit, streak: restoredStreak };
         })
       );
 
