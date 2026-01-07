@@ -1722,50 +1722,62 @@ const HabitTracker = () => {
           <div style={{
             display: 'flex',
             alignItems: 'center',
-            justifyContent: 'space-between',
+            gap: isMobile ? '8px' : '10px',
             padding: isMobile ? '8px 0 4px' : '10px 0 4px',
             fontSize: isMobile ? '11px' : '12px',
-            letterSpacing: '0.5px',
           }}>
-            {/* Left: Progress blocks */}
+            {/* Left bracket + percentage */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              flexShrink: 0,
             }}>
               <span style={{ color: '#555', fontSize: isMobile ? '10px' : '11px' }}>├</span>
               <span style={{
-                color: completionPercent === 100 ? '#00ff41' : '#444',
-                textShadow: completionPercent === 100 ? '0 0 8px #00ff41, 0 0 12px #00ff41' : 'none',
-                transition: 'all 0.3s ease',
-                letterSpacing: '-1px',
-                fontSize: isMobile ? '10px' : '12px',
+                color: completionPercent === 100 ? '#00ff41' : '#888',
+                fontWeight: 'bold',
+                fontSize: isMobile ? '11px' : '13px',
+                textShadow: completionPercent === 100 ? '0 0 8px #00ff41' : 'none',
+                minWidth: isMobile ? '32px' : '38px',
               }}>
-                {(() => {
-                  const barWidth = isMobile ? 10 : 16;
-                  const filled = Math.round((completionPercent / 100) * barWidth);
-                  return '▓'.repeat(filled) + '░'.repeat(barWidth - filled);
-                })()}
+                {completionPercent}%
               </span>
             </div>
 
-            {/* Center: Percentage */}
+            {/* Progress bar - flexes to fill with block pattern */}
             <div style={{
-              color: completionPercent === 100 ? '#00ff41' : '#888',
-              fontWeight: 'bold',
-              fontSize: isMobile ? '12px' : '14px',
-              textShadow: completionPercent === 100 ? '0 0 8px #00ff41' : 'none',
-              minWidth: '40px',
-              textAlign: 'center',
+              flex: 1,
+              height: isMobile ? '10px' : '12px',
+              backgroundColor: '#222',
+              borderRadius: '1px',
+              overflow: 'hidden',
+              position: 'relative',
             }}>
-              {completionPercent}%
+              <div style={{
+                width: `${completionPercent}%`,
+                height: '100%',
+                backgroundColor: completionPercent === 100 ? '#00ff41' : '#555',
+                boxShadow: completionPercent === 100 ? '0 0 8px #00ff41' : 'none',
+                transition: 'width 0.3s ease',
+                // Segmented block pattern
+                backgroundImage: `repeating-linear-gradient(
+                  90deg,
+                  transparent,
+                  transparent 4px,
+                  #0a0a0a 4px,
+                  #0a0a0a 5px
+                )`,
+                backgroundSize: '5px 100%',
+              }} />
             </div>
 
-            {/* Right: Task count */}
+            {/* Right: Task count + bracket */}
             <div style={{
               display: 'flex',
               alignItems: 'center',
               gap: '6px',
+              flexShrink: 0,
             }}>
               <span style={{
                 color: completionPercent === 100 ? '#00ff41' : '#666',
@@ -1780,7 +1792,7 @@ const HabitTracker = () => {
                 letterSpacing: '1px',
                 textShadow: completionPercent === 100 ? '0 0 6px #00ff41' : 'none',
               }}>
-                {completionPercent === 100 ? '✓ DONE' : 'TODO'}
+                {completionPercent === 100 ? '✓' : 'TODO'}
               </span>
               <span style={{ color: '#555', fontSize: isMobile ? '10px' : '11px' }}>┤</span>
             </div>
