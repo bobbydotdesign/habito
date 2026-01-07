@@ -1935,6 +1935,7 @@ const HabitTracker = () => {
                   items={habitsForSelectedDate.map(h => h.id)}
                   strategy={verticalListSortingStrategy}
                 >
+              {console.log('HABITS DATA:', habitsForSelectedDate.map(h => ({ name: h.name, streak: h.streak, history: h.history, completed_today: h.completed_today })))}
               {habitsForSelectedDate.map((habit, index) => (
               <SortableItem key={habit.id} id={habit.id} disabled={isMobile}>
                 {({ listeners, isDragging }) => (
