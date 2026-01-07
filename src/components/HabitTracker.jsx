@@ -1489,16 +1489,30 @@ const HabitTracker = () => {
         zIndex: 999
       }} />
 
-      <div style={{ maxWidth: '700px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
-        
-        {/* Header */}
-        <div style={{ marginBottom: isMobile ? '20px' : '30px' }}>
+      {/* Header Container - sticky on mobile only */}
+      <div style={{
+        ...(isMobile ? {
+          position: 'fixed',
+          top: 0,
+          left: 0,
+          right: 0,
+          zIndex: 1001,
+          boxShadow: '0 2px 12px rgba(0,0,0,0.6)',
+        } : {
+          maxWidth: '700px',
+          margin: '0 auto',
+          marginBottom: '24px',
+        }),
+        backgroundColor: '#0a0a0a',
+        borderBottom: isMobile ? '1px solid #333' : 'none',
+      }}>
+        <div style={{ maxWidth: '700px', margin: '0 auto', padding: isMobile ? '8px 12px' : '0' }}>
           {/* Top row: Logo on left, Menu on right */}
           <div style={{
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
-            marginBottom: isMobile ? '12px' : '20px'
+            marginBottom: isMobile ? '8px' : '12px'
           }}>
             {/* Logo on left */}
             <div style={{ display: 'inline-flex', alignItems: 'flex-end' }}>
@@ -1625,7 +1639,7 @@ const HabitTracker = () => {
           <div style={{
             borderTop: '1px solid #333',
             borderBottom: '1px solid #333',
-            padding: isMobile ? '10px 0' : '12px 0',
+            padding: isMobile ? '8px 0' : '10px 0',
             display: 'flex',
             justifyContent: 'space-between',
             alignItems: 'center',
@@ -1703,73 +1717,81 @@ const HabitTracker = () => {
               </span>
             </div>
           </div>
-        </div>
 
-        {/* Stats Panel */}
-        <div style={{
-          border: '1px solid #333',
-          marginBottom: isMobile ? '16px' : '24px',
-          backgroundColor: '#0d0d0d'
-        }}>
+          {/* Progress Bar */}
           <div style={{
-            borderBottom: '1px solid #333',
-            padding: '8px 12px',
-            fontSize: isMobile ? '10px' : '11px',
-            color: '#888',
             display: 'flex',
-            justifyContent: 'space-between'
+            alignItems: 'center',
+            justifyContent: 'space-between',
+            padding: isMobile ? '8px 0 4px' : '10px 0 4px',
+            fontSize: isMobile ? '11px' : '12px',
+            letterSpacing: '0.5px',
           }}>
-            <span>{isMobile ? 'PROGRESS' : '┌─ DAILY PROGRESS ─┐'}</span>
-            <span>{completedCount}/{habits.length} COMPLETE</span>
-          </div>
-
-          <div style={{ padding: isMobile ? '12px' : '16px 12px' }}>
-            {/* Progress bar with percentage inside */}
+            {/* Left: Progress blocks */}
             <div style={{
-              position: 'relative',
-              height: isMobile ? '24px' : '28px',
-              backgroundColor: '#222',
-              borderRadius: '3px',
-              overflow: 'hidden'
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
             }}>
-              {/* Filled portion */}
-              <div style={{
-                width: `${completionPercent}%`,
-                height: '100%',
-                backgroundColor: completionPercent === 100 ? '#00ff41' : '#444',
-                borderRadius: '3px',
-                transition: 'width 0.3s ease, background-color 0.3s ease'
-              }} />
-              {/* Percentage text centered */}
+              <span style={{ color: '#555', fontSize: isMobile ? '10px' : '11px' }}>├</span>
               <span style={{
-                position: 'absolute',
-                top: '50%',
-                left: '50%',
-                transform: 'translate(-50%, -50%)',
-                fontSize: isMobile ? '12px' : '14px',
-                fontWeight: 'bold',
-                color: completionPercent === 100 ? '#000' : '#fff',
-                textShadow: completionPercent === 100 ? 'none' : '0 1px 2px rgba(0,0,0,0.5)'
+                color: completionPercent === 100 ? '#00ff41' : '#444',
+                textShadow: completionPercent === 100 ? '0 0 8px #00ff41, 0 0 12px #00ff41' : 'none',
+                transition: 'all 0.3s ease',
+                letterSpacing: '-1px',
+                fontSize: isMobile ? '10px' : '12px',
               }}>
-                {completionPercent}%
+                {(() => {
+                  const barWidth = isMobile ? 10 : 16;
+                  const filled = Math.round((completionPercent / 100) * barWidth);
+                  return '▓'.repeat(filled) + '░'.repeat(barWidth - filled);
+                })()}
               </span>
             </div>
 
-            {completionPercent === 100 && (
-              <div style={{
-                marginTop: '8px',
-                color: '#00ff41',
+            {/* Center: Percentage */}
+            <div style={{
+              color: completionPercent === 100 ? '#00ff41' : '#888',
+              fontWeight: 'bold',
+              fontSize: isMobile ? '12px' : '14px',
+              textShadow: completionPercent === 100 ? '0 0 8px #00ff41' : 'none',
+              minWidth: '40px',
+              textAlign: 'center',
+            }}>
+              {completionPercent}%
+            </div>
+
+            {/* Right: Task count */}
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              gap: '6px',
+            }}>
+              <span style={{
+                color: completionPercent === 100 ? '#00ff41' : '#666',
                 fontSize: isMobile ? '10px' : '11px',
-                animation: 'pulse 2s infinite',
-                letterSpacing: isMobile ? '1px' : '2px',
-                textAlign: 'center'
+                textShadow: completionPercent === 100 ? '0 0 6px #00ff41' : 'none',
               }}>
-                ★ ALL HABITS COMPLETE ★
-              </div>
-            )}
+                {completedCount}/{habitsForSelectedDate.length}
+              </span>
+              <span style={{
+                color: completionPercent === 100 ? '#00ff41' : '#555',
+                fontSize: isMobile ? '9px' : '10px',
+                letterSpacing: '1px',
+                textShadow: completionPercent === 100 ? '0 0 6px #00ff41' : 'none',
+              }}>
+                {completionPercent === 100 ? '✓ DONE' : 'TODO'}
+              </span>
+              <span style={{ color: '#555', fontSize: isMobile ? '10px' : '11px' }}>┤</span>
+            </div>
           </div>
         </div>
+      </div>
 
+      {/* Spacer for sticky header - mobile only */}
+      {isMobile && <div style={{ height: '140px' }} />}
+
+      <div style={{ maxWidth: '700px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
         {/* Navigation */}
         <div style={{
           display: 'flex',
