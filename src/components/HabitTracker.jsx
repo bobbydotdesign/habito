@@ -198,56 +198,15 @@ const HabitTracker = () => {
     return () => subscription.unsubscribe();
   }, [fetchHabits]);
 
-  // Real-time subscription for live sync across browser instances
+  // Real-time subscription DISABLED - was causing slow API responses
+  // TODO: Re-enable once we figure out the performance issue
   useEffect(() => {
     if (!user) return;
 
-    let channel;
-
-    try {
-      channel = supabase
-        .channel('habits-changes')
-        .on(
-          'postgres_changes',
-          {
-            event: '*',
-            schema: 'public',
-            table: 'habits',
-            filter: `user_id=eq.${user.id}`
-          },
-          (payload) => {
-            if (payload.eventType === 'INSERT') {
-              setHabits(prev => {
-                // Avoid duplicates
-                if (prev.some(h => h.id === payload.new.id)) return prev;
-                return [...prev, payload.new];
-              });
-            } else if (payload.eventType === 'UPDATE') {
-              setHabits(prev => prev.map(h => h.id === payload.new.id ? payload.new : h));
-            } else if (payload.eventType === 'DELETE') {
-              setHabits(prev => prev.filter(h => h.id !== payload.old.id));
-            }
-          }
-        )
-        .subscribe((status) => {
-          if (status === 'SUBSCRIBED') {
-            console.log('realtime: connected');
-          } else if (status === 'CHANNEL_ERROR' || status === 'TIMED_OUT') {
-            console.warn('realtime: connection failed (app will still work, refresh to sync)');
-          }
-        });
-    } catch (error) {
-      console.warn('realtime: could not connect -', error.message);
-    }
+    // Realtime disabled for performance testing
+    console.log('realtime: disabled for performance');
 
     return () => {
-      if (channel) {
-        try {
-          supabase.removeChannel(channel);
-        } catch (error) {
-          // Ignore cleanup errors
-        }
-      }
     };
   }, [user]);
 
@@ -1452,7 +1411,8 @@ const HabitTracker = () => {
           ))}
         </div>
 
-        {/* Habits List */}
+        {/* Habits List - Only show on Today view */}
+        {selectedView === 'today' && (
         <div style={{
           border: '1px solid #333',
           backgroundColor: '#0d0d0d'
@@ -1858,8 +1818,10 @@ const HabitTracker = () => {
             </>
           )}
         </div>
+        )}
 
-        {/* Add Habit Button */}
+        {/* Add Habit Button - Only show on Today view */}
+        {selectedView === 'today' && (
         <button
           onClick={() => setShowAddModal(true)}
           style={{
@@ -1886,6 +1848,7 @@ const HabitTracker = () => {
         >
           + ADD NEW HABIT
         </button>
+        )}
 
         {/* Activity View */}
         {selectedView === 'activity' && (
@@ -1893,7 +1856,6 @@ const HabitTracker = () => {
             userId={user?.id}
             habits={habits}
             isMobile={isMobile}
-            cursorBlink={cursorBlink}
           />
         )}
 

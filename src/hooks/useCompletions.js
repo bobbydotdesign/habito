@@ -10,8 +10,8 @@ export const useCompletions = (userId) => {
    * Uses upsert to handle both new and existing records
    */
   const recordCompletion = useCallback(async (habitId, completionCount, dailyGoal) => {
-    if (!userId || !habitId) {
-      return { success: false, error: 'Missing userId or habitId' };
+    if (!userId || !habitId || dailyGoal <= 0) {
+      return { success: false, error: 'Missing userId, habitId, or invalid dailyGoal' };
     }
 
     const today = new Date().toISOString().split('T')[0];
@@ -22,6 +22,7 @@ export const useCompletions = (userId) => {
         const { error } = await supabase
           .from('completions')
           .delete()
+          .eq('user_id', userId)
           .eq('habit_id', habitId)
           .eq('completed_date', today);
 

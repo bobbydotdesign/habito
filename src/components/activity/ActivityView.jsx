@@ -1,22 +1,97 @@
-import React, { useState, useMemo } from 'react';
-import { useActivityData } from '../../hooks/useActivityData';
+import React, { useMemo, memo, useState, useEffect } from 'react';
+import { supabase } from '../../lib/supabase';
 import { generateGridData, calculateActivityStats } from '../../utils/activityUtils';
 import ContributionGrid from './ContributionGrid';
 
 /**
  * ActivityView - GitHub-style activity tracking view
- * Replaces the Week and Stats tabs with a unified activity view
+ * Always shows full year like GitHub's contribution graph
  */
-const ActivityView = ({ userId, habits, isMobile, cursorBlink }) => {
-  const [timePeriod, setTimePeriod] = useState('month');
+const ACTIVITY_CACHE_KEY = 'habito_activity_cache';
 
-  // Fetch activity data
-  const { data: activityData, loading, error, refetch } = useActivityData(userId, timePeriod);
+const ActivityView = ({ userId, habits, isMobile }) => {
+  const currentYear = new Date().getFullYear();
+  const [selectedYear, setSelectedYear] = useState(currentYear);
 
-  // Generate grid data
+  // Load from cache immediately for instant display
+  const [activityData, setActivityData] = useState(() => {
+    try {
+      const cached = localStorage.getItem(ACTIVITY_CACHE_KEY);
+      return cached ? JSON.parse(cached) : null;
+    } catch { return null; }
+  });
+  const [loading, setLoading] = useState(!activityData);
+  const [error, setError] = useState(null);
+
+  // Available years (current year and previous years with data)
+  const availableYears = useMemo(() => {
+    const years = [currentYear];
+    if (activityData?.raw) {
+      activityData.raw.forEach(row => {
+        const year = parseInt(row.completed_date?.split('-')[0]);
+        if (year && !years.includes(year)) {
+          years.push(year);
+        }
+      });
+    }
+    return years.sort((a, b) => b - a); // Newest first
+  }, [activityData, currentYear]);
+
+  // Fetch fresh data in background
+  useEffect(() => {
+    if (!userId) {
+      setLoading(false);
+      return;
+    }
+
+    let mounted = true;
+
+    // If we have cached data, show it immediately
+    if (activityData) {
+      setLoading(false);
+    }
+
+    supabase
+      .from('completions')
+      .select('completed_date, completion_count, daily_goal')
+      .eq('user_id', userId)
+      .then(({ data: completions, error: fetchError }) => {
+        if (!mounted) return;
+
+        if (fetchError) {
+          console.error('Activity error:', fetchError);
+          if (!activityData) {
+            setError(fetchError.message);
+          }
+          setLoading(false);
+          return;
+        }
+
+        // Aggregate by date
+        const byDate = {};
+        (completions || []).forEach(row => {
+          const date = row.completed_date;
+          const pct = row.daily_goal > 0 ? Math.min(row.completion_count / row.daily_goal, 1) : 0;
+          byDate[date] = (byDate[date] || 0) + pct;
+        });
+
+        const newData = { byDate, raw: completions || [] };
+        setActivityData(newData);
+        setLoading(false);
+
+        // Cache for next visit
+        try {
+          localStorage.setItem(ACTIVITY_CACHE_KEY, JSON.stringify(newData));
+        } catch {}
+      });
+
+    return () => { mounted = false; };
+  }, [userId]);
+
+  // Generate grid data for selected year
   const gridData = useMemo(() =>
-    generateGridData(activityData, timePeriod, habits.length),
-    [activityData, timePeriod, habits.length]
+    generateGridData(activityData, selectedYear, habits.length),
+    [activityData, selectedYear, habits.length]
   );
 
   // Calculate stats
@@ -25,124 +100,22 @@ const ActivityView = ({ userId, habits, isMobile, cursorBlink }) => {
     [activityData, habits.length]
   );
 
-  const periods = [
-    { key: 'week', label: 'W', fullLabel: 'Week' },
-    { key: 'month', label: 'M', fullLabel: 'Month' },
-    { key: 'year', label: 'Y', fullLabel: 'Year' },
-    { key: 'all', label: '∞', fullLabel: 'All' }
-  ];
+  // Calculate total completions for the year
+  const totalCompletions = useMemo(() => {
+    if (!activityData || !activityData.raw) return 0;
+    return activityData.raw.reduce((sum, row) => sum + (row.completion_count || 0), 0);
+  }, [activityData]);
+
+  const refetch = () => {};
 
   return (
     <div style={{ marginTop: '24px' }}>
-      {/* Main activity container */}
+      {/* Stats panel - at top for quick glance */}
       <div style={{
         border: '1px solid #333',
-        backgroundColor: '#0d0d0d'
+        backgroundColor: '#0d0d0d',
+        marginBottom: '16px'
       }}>
-        {/* Header with period selector */}
-        <div style={{
-          borderBottom: '1px solid #333',
-          padding: '8px 12px',
-          display: 'flex',
-          justifyContent: 'space-between',
-          alignItems: 'center'
-        }}>
-          <span style={{
-            fontSize: '11px',
-            color: '#666',
-            letterSpacing: '1px'
-          }}>
-            {isMobile ? 'ACTIVITY' : '┌─ ACTIVITY ─┐'}
-          </span>
-
-          {/* Period selector */}
-          <div style={{ display: 'flex', gap: '2px' }}>
-            {periods.map(({ key, label, fullLabel }) => (
-              <button
-                key={key}
-                onClick={() => setTimePeriod(key)}
-                title={fullLabel}
-                style={{
-                  background: timePeriod === key ? '#1a1a1a' : 'transparent',
-                  border: '1px solid #333',
-                  color: timePeriod === key ? '#00ff41' : '#666',
-                  padding: isMobile ? '4px 8px' : '4px 10px',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  fontSize: '10px',
-                  letterSpacing: '0.5px',
-                  transition: 'all 0.15s'
-                }}
-              >
-                {isMobile ? label : `[${fullLabel.toUpperCase()}]`}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Grid content */}
-        <div style={{ padding: isMobile ? '12px' : '16px' }}>
-          {loading && !activityData ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '40px',
-              color: '#00ff41',
-              fontSize: '12px'
-            }}>
-              loading activity data...
-            </div>
-          ) : error ? (
-            <div style={{
-              textAlign: 'center',
-              padding: '40px',
-              color: '#ff4444',
-              fontSize: '12px'
-            }}>
-              error loading activity: {error}
-              <br />
-              <button
-                onClick={refetch}
-                style={{
-                  marginTop: '12px',
-                  background: 'transparent',
-                  border: '1px solid #ff4444',
-                  color: '#ff4444',
-                  padding: '4px 12px',
-                  cursor: 'pointer',
-                  fontSize: '11px',
-                  fontFamily: 'inherit'
-                }}
-              >
-                retry
-              </button>
-            </div>
-          ) : (
-            <ContributionGrid
-              weeks={gridData}
-              period={timePeriod}
-              totalHabits={habits.length}
-              isMobile={isMobile}
-            />
-          )}
-        </div>
-      </div>
-
-      {/* Stats panel */}
-      <div style={{
-        marginTop: '16px',
-        border: '1px solid #333',
-        backgroundColor: '#0d0d0d'
-      }}>
-        <div style={{
-          borderBottom: '1px solid #333',
-          padding: '8px 12px',
-          fontSize: '11px',
-          color: '#666',
-          letterSpacing: '1px'
-        }}>
-          {isMobile ? 'STATS' : '┌─ ANALYTICS ─┐'}
-        </div>
-
         <div style={{
           padding: isMobile ? '12px' : '16px',
           display: 'grid',
@@ -231,22 +204,97 @@ const ActivityView = ({ userId, habits, isMobile, cursorBlink }) => {
             </div>
           </div>
         </div>
+      </div>
 
-        {/* Total habits indicator */}
+      {/* Activity grid - GitHub style */}
+      <div style={{
+        border: '1px solid #333',
+        backgroundColor: '#0d0d0d'
+      }}>
+        {/* Header with year tabs */}
         <div style={{
-          borderTop: '1px solid #222',
-          padding: '8px 12px',
-          fontSize: '10px',
-          color: '#444',
+          borderBottom: '1px solid #333',
+          padding: '10px 12px',
           display: 'flex',
-          justifyContent: 'space-between'
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          flexWrap: 'wrap',
+          gap: '8px'
         }}>
-          <span>tracking {habits.length} habit{habits.length !== 1 ? 's' : ''}</span>
-          <span>{stats.totalCompletions} total completions</span>
+          {/* Year tabs */}
+          <div style={{ display: 'flex', gap: '4px' }}>
+            {availableYears.map(year => (
+              <button
+                key={year}
+                onClick={() => setSelectedYear(year)}
+                style={{
+                  background: selectedYear === year ? '#1a1a1a' : 'transparent',
+                  border: `1px solid ${selectedYear === year ? '#00ff41' : '#333'}`,
+                  color: selectedYear === year ? '#00ff41' : '#666',
+                  padding: '4px 10px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: '11px',
+                  borderRadius: '2px'
+                }}
+              >
+                {year}
+              </button>
+            ))}
+          </div>
+          <span style={{ fontSize: '10px', color: '#444' }}>
+            <span style={{ color: '#00ff41' }}>{totalCompletions}</span> completions
+          </span>
+        </div>
+
+        {/* Grid content */}
+        <div style={{ padding: isMobile ? '12px' : '16px' }}>
+          {loading && !activityData ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '40px',
+              color: '#00ff41',
+              fontSize: '12px'
+            }}>
+              loading activity data...
+            </div>
+          ) : error ? (
+            <div style={{
+              textAlign: 'center',
+              padding: '40px',
+              color: '#ff4444',
+              fontSize: '12px'
+            }}>
+              error loading activity: {error}
+              <br />
+              <button
+                onClick={refetch}
+                style={{
+                  marginTop: '12px',
+                  background: 'transparent',
+                  border: '1px solid #ff4444',
+                  color: '#ff4444',
+                  padding: '4px 12px',
+                  cursor: 'pointer',
+                  fontSize: '11px',
+                  fontFamily: 'inherit'
+                }}
+              >
+                retry
+              </button>
+            </div>
+          ) : (
+            <ContributionGrid
+              weeks={gridData}
+              totalHabits={habits.length}
+              isMobile={isMobile}
+            />
+          )}
         </div>
       </div>
     </div>
   );
 };
 
-export default ActivityView;
+// Memoize to prevent re-renders from cursorBlink in parent
+export default memo(ActivityView);

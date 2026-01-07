@@ -57,11 +57,11 @@ CREATE POLICY "Users can delete own completions"
   USING (auth.uid() = user_id);
 
 -- ============================================
--- 4. ENABLE REALTIME (optional)
+-- 4. ENABLE REALTIME
 -- ============================================
 
--- Uncomment if you want real-time sync for completions
--- ALTER publication supabase_realtime ADD TABLE completions;
+-- Enable real-time sync for completions (required for live updates)
+ALTER publication supabase_realtime ADD TABLE completions;
 
 -- ============================================
 -- 5. BACKFILL EXISTING HISTORY DATA

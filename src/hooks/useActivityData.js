@@ -12,7 +12,6 @@ export const useActivityData = (userId, timePeriod) => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(null);
   const cacheRef = useRef(new Map());
-  const abortControllerRef = useRef(null);
 
   // Calculate date range based on period
   const dateRange = useMemo(() => {
@@ -66,12 +65,6 @@ export const useActivityData = (userId, timePeriod) => {
     } else {
       setLoading(true);
     }
-
-    // Cancel any pending requests
-    if (abortControllerRef.current) {
-      abortControllerRef.current.abort();
-    }
-    abortControllerRef.current = new AbortController();
 
     try {
       // Fetch completions in date range
@@ -130,12 +123,6 @@ export const useActivityData = (userId, timePeriod) => {
   // Initial fetch and refetch on period change
   useEffect(() => {
     fetchData();
-
-    return () => {
-      if (abortControllerRef.current) {
-        abortControllerRef.current.abort();
-      }
-    };
   }, [fetchData]);
 
   // Real-time subscription for updates

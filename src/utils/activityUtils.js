@@ -4,7 +4,7 @@
 
 // Terminal green color scale (matching the retro aesthetic)
 const COLOR_LEVELS = {
-  0: '#161b22',    // No completions - dark gray
+  0: '#2d333b',    // No completions - lighter gray for legibility
   1: '#0e4429',    // 1-25% - very dark green
   2: '#006d32',    // 26-50% - dark green
   3: '#26a641',    // 51-75% - medium green
@@ -50,59 +50,43 @@ export const getIntensityLevel = (percentage) => {
  * @param {number} totalHabits - Total number of habits for percentage calculation
  * @returns {Array} - Array of week arrays containing day objects
  */
-export const generateGridData = (activityData, period, totalHabits) => {
+export const generateGridData = (activityData, year, totalHabits) => {
   const { byDate = {} } = activityData || {};
+  const today = new Date().toISOString().split('T')[0];
 
-  const endDate = new Date();
-  const startDate = new Date();
+  // Start from Jan 1 of the selected year
+  const startDate = new Date(year, 0, 1);
+  // End at Dec 31 of the selected year
+  const endDate = new Date(year, 11, 31);
 
-  // Calculate weeks to show based on period
-  let weeksToShow;
-  switch (period) {
-    case 'week':
-      weeksToShow = 1;
-      break;
-    case 'month':
-      weeksToShow = 5; // ~35 days
-      break;
-    case 'year':
-      weeksToShow = 53;
-      break;
-    case 'all':
-      weeksToShow = 104; // ~2 years
-      break;
-    default:
-      weeksToShow = 5;
-  }
+  // Adjust start to beginning of week (Sunday)
+  const startDayOfWeek = startDate.getDay();
+  startDate.setDate(startDate.getDate() - startDayOfWeek);
 
-  // Align end date to end of week (Saturday)
+  // Adjust end to end of week (Saturday)
   const endDayOfWeek = endDate.getDay();
   endDate.setDate(endDate.getDate() + (6 - endDayOfWeek));
-
-  // Calculate start date
-  startDate.setDate(endDate.getDate() - (weeksToShow * 7) + 1);
 
   // Generate all dates
   const weeks = [];
   const current = new Date(startDate);
 
-  for (let w = 0; w < weeksToShow; w++) {
+  while (current <= endDate) {
     const week = [];
     for (let d = 0; d < 7; d++) {
       const dateStr = current.toISOString().split('T')[0];
-      const today = new Date().toISOString().split('T')[0];
       const isFuture = dateStr > today;
+      const isOutsideYear = current.getFullYear() !== year;
 
       // Get completion value for this date
       const rawValue = byDate[dateStr] || 0;
-      // Calculate percentage based on total habits
       const percentage = totalHabits > 0 ? Math.min(rawValue / totalHabits, 1) : 0;
 
       week.push({
         date: dateStr,
-        percentage: isFuture ? null : percentage,
-        rawValue: isFuture ? null : rawValue,
-        isFuture,
+        percentage: isFuture || isOutsideYear ? null : percentage,
+        rawValue: isFuture || isOutsideYear ? null : rawValue,
+        isFuture: isFuture || isOutsideYear,
         isToday: dateStr === today
       });
 
