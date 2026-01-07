@@ -2,6 +2,34 @@ import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { supabase } from '../lib/supabase';
 import { useCompletions } from '../hooks/useCompletions';
 import ActivityView from './activity/ActivityView';
+import { DndContext, closestCenter, PointerSensor, TouchSensor, useSensor, useSensors } from '@dnd-kit/core';
+import { SortableContext, verticalListSortingStrategy, useSortable, arrayMove } from '@dnd-kit/sortable';
+import { CSS } from '@dnd-kit/utilities';
+
+// Sortable wrapper component for habit rows
+const SortableItem = ({ id, children, disabled }) => {
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging
+  } = useSortable({ id, disabled });
+
+  const style = {
+    transform: CSS.Transform.toString(transform),
+    transition,
+    opacity: isDragging ? 0.5 : 1,
+    zIndex: isDragging ? 100 : 'auto'
+  };
+
+  return (
+    <div ref={setNodeRef} style={style} {...attributes}>
+      {children({ listeners, isDragging })}
+    </div>
+  );
+};
 
 const HABITS_CACHE_KEY = 'habito_habits_cache';
 
@@ -34,6 +62,11 @@ const HabitTracker = () => {
   const [editingHabit, setEditingHabit] = useState(null);
   const [editHabitName, setEditHabitName] = useState('');
   const [editHabitGoal, setEditHabitGoal] = useState(1);
+  const [editHabitTime, setEditHabitTime] = useState('');
+  const [editHabitDays, setEditHabitDays] = useState([0,1,2,3,4,5,6]);
+  const [newHabitTime, setNewHabitTime] = useState('');
+  const [newHabitDays, setNewHabitDays] = useState([0,1,2,3,4,5,6]);
+  const [openMenuId, setOpenMenuId] = useState(null);
   const [isMobile, setIsMobile] = useState(window.innerWidth < 600);
 
   // Swipe gesture state for native mobile feel
@@ -52,6 +85,18 @@ const HabitTracker = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Close menu when clicking outside
+  useEffect(() => {
+    if (!openMenuId) return;
+    const handleClickOutside = (e) => {
+      if (!e.target.closest('[data-menu]')) {
+        setOpenMenuId(null);
+      }
+    };
+    document.addEventListener('click', handleClickOutside);
+    return () => document.removeEventListener('click', handleClickOutside);
+  }, [openMenuId]);
 
   const bootMessages = [
     '> Habito v2.5.0 initializing...',
@@ -96,6 +141,7 @@ const HabitTracker = () => {
       .from('habits')
       .select('*')
       .eq('user_id', userId)
+      .order('position', { ascending: true, nullsFirst: false })
       .order('created_at', { ascending: true });
 
     if (error) {
@@ -431,6 +477,59 @@ const HabitTracker = () => {
     return getHabitCompletions(habit) >= (habit.daily_goal || 1);
   };
 
+  // Check if habit is scheduled for today
+  const isHabitScheduledToday = (habit) => {
+    const today = new Date().getDay(); // 0=Sun, 1=Mon, etc.
+    const scheduledDays = habit.scheduled_days || [0,1,2,3,4,5,6];
+    return scheduledDays.includes(today);
+  };
+
+  // Format time as compact string (8A, 8:30P)
+  const formatScheduledTime = (timeString) => {
+    if (!timeString) return null;
+    const [hours, minutes] = timeString.split(':');
+    const hour = parseInt(hours, 10);
+    const ampm = hour >= 12 ? 'P' : 'A';
+    const hour12 = hour % 12 || 12;
+    if (minutes === '00') {
+      return `${hour12}${ampm}`;
+    }
+    return `${hour12}:${minutes}${ampm}`;
+  };
+
+  // dnd-kit sensors for drag and drop
+  const sensors = useSensors(
+    useSensor(PointerSensor, {
+      activationConstraint: { distance: 8 }
+    }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 200, tolerance: 5 }
+    })
+  );
+
+  // Handle drag end - reorder habits
+  const handleDragEnd = async (event) => {
+    const { active, over } = event;
+
+    if (active.id !== over?.id) {
+      const oldIndex = habits.findIndex(h => h.id === active.id);
+      const newIndex = habits.findIndex(h => h.id === over.id);
+
+      // Optimistic update
+      const newHabits = arrayMove(habits, oldIndex, newIndex);
+      setHabits(newHabits);
+
+      // Update positions in database
+      setSyncing(true);
+      for (let i = 0; i < newHabits.length; i++) {
+        await supabase
+          .from('habits')
+          .update({ position: i })
+          .eq('id', newHabits[i].id);
+      }
+      setSyncing(false);
+    }
+  };
 
   const signInWithPassword = async () => {
     if (!email.trim() || !password.trim()) return;
@@ -821,6 +920,9 @@ const HabitTracker = () => {
       completed_today: false,
       completions_today: 0,
       daily_goal: newHabitGoal,
+      position: habits.length,
+      scheduled_time: newHabitTime || null,
+      scheduled_days: newHabitDays,
       history: [0, 0, 0, 0, 0, 0, 0]
     };
 
@@ -836,9 +938,11 @@ const HabitTracker = () => {
     } else {
       setHabits([...habits, data]);
     }
-    
+
     setNewHabitName('');
     setNewHabitGoal(1);
+    setNewHabitTime('');
+    setNewHabitDays([0,1,2,3,4,5,6]);
     setShowAddModal(false);
     setSyncing(false);
   };
@@ -862,7 +966,10 @@ const HabitTracker = () => {
     setEditingHabit(habit);
     setEditHabitName(habit.name);
     setEditHabitGoal(habit.daily_goal || 1);
+    setEditHabitTime(habit.scheduled_time || '');
+    setEditHabitDays(habit.scheduled_days || [0,1,2,3,4,5,6]);
     setConfirmingDeleteId(null);
+    setOpenMenuId(null);
   };
 
   const updateHabit = async () => {
@@ -870,7 +977,9 @@ const HabitTracker = () => {
 
     const updates = {
       name: editHabitName.toLowerCase(),
-      daily_goal: editHabitGoal
+      daily_goal: editHabitGoal,
+      scheduled_time: editHabitTime || null,
+      scheduled_days: editHabitDays
     };
 
     // Optimistic update
@@ -893,6 +1002,8 @@ const HabitTracker = () => {
     setEditingHabit(null);
     setEditHabitName('');
     setEditHabitGoal(1);
+    setEditHabitTime('');
+    setEditHabitDays([0,1,2,3,4,5,6]);
     setSyncing(false);
   };
 
@@ -1674,15 +1785,14 @@ const HabitTracker = () => {
             color: '#666',
             display: 'grid',
             gridTemplateColumns: isMobile
-              ? '24px 1fr 32px 50px 24px'
-              : '30px 1fr 40px 80px 76px 30px',
+              ? '24px 1fr 32px 50px'
+              : '30px 1fr 50px 60px 28px',
             gap: isMobile ? '6px' : '8px'
           }}>
             <span></span>
             <span>HABIT</span>
-            <span>{isMobile ? '' : '×'}</span>
-            <span>{isMobile ? '' : 'STREAK'}</span>
-            <span>{isMobile ? '' : 'STATUS'}</span>
+            <span style={{ textAlign: 'center' }}>{isMobile ? '' : 'STATUS'}</span>
+            <span style={{ textAlign: 'right' }}>{isMobile ? '' : 'STREAK'}</span>
             {!isMobile && <span></span>}
           </div>
 
@@ -1752,12 +1862,22 @@ const HabitTracker = () => {
                   <span>options <span style={{ color: '#ff4444' }}>←</span></span>
                 </div>
               )}
+              <DndContext
+                sensors={sensors}
+                collisionDetection={closestCenter}
+                onDragEnd={handleDragEnd}
+              >
+                <SortableContext
+                  items={habitsForSelectedDate.map(h => h.id)}
+                  strategy={verticalListSortingStrategy}
+                >
               {habitsForSelectedDate.map((habit, index) => (
+              <SortableItem key={habit.id} id={habit.id} disabled={isMobile}>
+                {({ listeners, isDragging }) => (
               <div
-                key={habit.id}
                 style={{
                   position: 'relative',
-                  overflow: 'hidden',
+                  overflow: isMobile ? 'hidden' : 'visible',
                   borderBottom: index < habitsForSelectedDate.length - 1 ? '1px solid #222' : 'none'
                 }}
               >
@@ -1842,17 +1962,36 @@ const HabitTracker = () => {
                         {habit.icon}
                       </span>
 
-                      {/* Habit name */}
-                      <span style={{
+                      {/* Habit name + time */}
+                      <div style={{
                         flex: 1,
-                        color: isHabitCompleted(habit) ? '#00ff41' : '#888',
-                        fontSize: '13px',
-                        overflow: 'hidden',
-                        textOverflow: 'ellipsis',
-                        whiteSpace: 'nowrap'
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '6px',
+                        overflow: 'hidden'
                       }}>
-                        {habit.name}
-                      </span>
+                        <span style={{
+                          color: isHabitCompleted(habit) ? '#00ff41' : '#888',
+                          fontSize: '13px',
+                          overflow: 'hidden',
+                          textOverflow: 'ellipsis',
+                          whiteSpace: 'nowrap'
+                        }}>
+                          {habit.name}
+                        </span>
+                        {formatScheduledTime(habit.scheduled_time) && (
+                          <span style={{
+                            fontSize: '9px',
+                            color: '#555',
+                            background: 'rgba(255,255,255,0.05)',
+                            padding: '2px 4px',
+                            borderRadius: '3px',
+                            flexShrink: 0
+                          }}>
+                            {formatScheduledTime(habit.scheduled_time)}
+                          </span>
+                        )}
+                      </div>
 
                       {/* Progress dots (matching desktop style) */}
                       <div style={{ display: 'flex', gap: '3px', flexShrink: 0 }}>
@@ -1878,7 +2017,7 @@ const HabitTracker = () => {
                         textAlign: 'right',
                         flexShrink: 0
                       }}>
-                        {habit.streak > 0 ? `${habit.streak}d 🔥` : '---'}
+                        {habit.streak > 0 ? `${habit.streak}d 🔥` : ''}
                       </span>
                     </div>
 
@@ -1950,121 +2089,262 @@ const HabitTracker = () => {
                     )}
                   </>
                 ) : (
-                  /* Desktop: Single-row grid layout */
-                  <div style={{
-                    display: 'grid',
-                    gridTemplateColumns: '30px 1fr 40px 80px 76px 30px',
-                    gap: '8px',
-                    alignItems: 'center',
-                    padding: '12px',
-                    backgroundColor: isHabitCompleted(habit) ? 'rgba(0,255,65,0.03)' : 'transparent',
-                    transition: 'background 0.15s'
-                  }}>
-                    <span style={{
-                      fontSize: '16px',
-                      color: isHabitCompleted(habit) ? '#00ff41' : '#444',
-                      textShadow: isHabitCompleted(habit) ? '0 0 8px #00ff41' : 'none'
-                    }}>
-                      {habit.icon}
-                    </span>
-
-                    <div>
-                      <span style={{
-                        color: isHabitCompleted(habit) ? '#00ff41' : '#888',
-                        fontSize: '13px'
-                      }}>
-                        {habit.name}
-                      </span>
-                    </div>
-
-                    <div style={{ display: 'flex', gap: '3px' }}>
-                      {Array.from({ length: habit.daily_goal || 1 }).map((_, i) => (
-                        <span
-                          key={i}
-                          style={{
-                            fontSize: '10px',
-                            color: i < getHabitCompletions(habit) ? '#00ff41' : '#555',
-                            textShadow: i < getHabitCompletions(habit) ? '0 0 4px #00ff41' : 'none'
-                          }}
-                        >
-                          {i < getHabitCompletions(habit) ? '●' : '○'}
-                        </span>
-                      ))}
-                    </div>
-
-                    <span style={{
-                      color: habit.streak > 7 ? '#00ff41' : habit.streak > 3 ? '#ffaa00' : '#666',
-                      fontSize: '12px'
-                    }}>
-                      {habit.streak > 0 ? `${habit.streak}d 🔥` : '---'}
-                    </span>
-
-                    {confirmingDeleteId === habit.id ? (
-                      <button
-                        onClick={() => {
-                          deleteHabit(habit.id);
-                          setConfirmingDeleteId(null);
-                        }}
-                        style={{
-                          background: 'transparent',
-                          border: '1px solid #ff4444',
-                          color: '#ff4444',
-                          padding: '4px 8px',
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          fontSize: '10px',
-                          transition: 'all 0.15s'
-                        }}
-                      >
-                        [CONFIRM]
-                      </button>
-                    ) : (
-                      <button
-                        onClick={() => incrementHabit(habit.id)}
-                        style={{
-                          background: 'transparent',
-                          border: `1px solid ${isHabitCompleted(habit) ? '#00ff41' : '#444'}`,
-                          color: isHabitCompleted(habit) ? '#00ff41' : '#666',
-                          padding: '4px 8px',
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          fontSize: '10px',
-                          transition: 'all 0.15s'
-                        }}
-                      >
-                        {isHabitCompleted(habit) ? '[DONE]' : '[    ]'}
-                      </button>
-                    )}
-
-                    <button
-                      onClick={() => {
-                        if (confirmingDeleteId === habit.id) {
-                          setConfirmingDeleteId(null);
-                        } else {
-                          setConfirmingDeleteId(habit.id);
-                        }
+                  /* Desktop: Single-row grid layout - clickable to toggle */
+                  <>
+                    <div
+                      onClick={(e) => {
+                        // Don't toggle if clicking on menu button or menu
+                        if (e.target.closest('[data-menu]')) return;
+                        incrementHabit(habit.id);
                       }}
                       style={{
-                        background: 'transparent',
-                        border: 'none',
-                        color: confirmingDeleteId === habit.id ? '#ff4444' : '#666',
-                        cursor: 'pointer',
-                        fontFamily: 'inherit',
-                        fontSize: '14px',
-                        padding: '0',
-                        opacity: confirmingDeleteId === habit.id ? 1 : 0.7,
-                        transition: 'all 0.15s'
+                        display: 'grid',
+                        gridTemplateColumns: '30px 1fr 50px 60px 28px',
+                        gap: '8px',
+                        alignItems: 'center',
+                        padding: '12px',
+                        backgroundColor: isHabitCompleted(habit) ? 'rgba(0,255,65,0.03)' : 'transparent',
+                        transition: 'background 0.15s',
+                        cursor: 'pointer'
                       }}
-                      onMouseEnter={e => e.target.style.opacity = 1}
-                      onMouseLeave={e => { if (confirmingDeleteId !== habit.id) e.target.style.opacity = 0.5 }}
-                      title={confirmingDeleteId === habit.id ? 'Cancel delete' : 'Delete habit'}
                     >
-                      ×
-                    </button>
-                  </div>
+                      {/* Icon */}
+                      <span style={{
+                        fontSize: '16px',
+                        color: isHabitCompleted(habit) ? '#00ff41' : '#444',
+                        textShadow: isHabitCompleted(habit) ? '0 0 8px #00ff41' : 'none',
+                        opacity: isHabitScheduledToday(habit) ? 1 : 0.35
+                      }}>
+                        {habit.icon}
+                      </span>
+
+                      {/* Name + Time badge */}
+                      <div style={{
+                        display: 'flex',
+                        alignItems: 'center',
+                        gap: '8px',
+                        opacity: isHabitScheduledToday(habit) ? 1 : 0.35
+                      }}>
+                        <span style={{
+                          color: isHabitCompleted(habit) ? '#00ff41' : '#888',
+                          fontSize: '13px'
+                        }}>
+                          {habit.name}
+                        </span>
+                        {formatScheduledTime(habit.scheduled_time) && (
+                          <span style={{
+                            fontSize: '10px',
+                            color: '#555',
+                            backgroundColor: 'rgba(255,255,255,0.05)',
+                            padding: '2px 5px',
+                            borderRadius: '3px'
+                          }}>
+                            {formatScheduledTime(habit.scheduled_time)}
+                          </span>
+                        )}
+                      </div>
+
+                      {/* Progress dots */}
+                      <div style={{
+                        display: 'flex',
+                        gap: '3px',
+                        justifyContent: 'center',
+                        opacity: isHabitScheduledToday(habit) ? 1 : 0.35
+                      }}>
+                        {Array.from({ length: habit.daily_goal || 1 }).map((_, i) => (
+                          <span
+                            key={i}
+                            style={{
+                              fontSize: '10px',
+                              color: i < getHabitCompletions(habit) ? '#00ff41' : '#555',
+                              textShadow: i < getHabitCompletions(habit) ? '0 0 4px #00ff41' : 'none'
+                            }}
+                          >
+                            {i < getHabitCompletions(habit) ? '●' : '○'}
+                          </span>
+                        ))}
+                      </div>
+
+                      {/* Streak */}
+                      <span style={{
+                        color: habit.streak > 7 ? '#00ff41' : habit.streak > 3 ? '#ffaa00' : '#666',
+                        fontSize: '12px',
+                        textAlign: 'right',
+                        opacity: isHabitScheduledToday(habit) ? 1 : 0.35
+                      }}>
+                        {habit.streak > 0 ? `${habit.streak}d 🔥` : ''}
+                      </span>
+
+                      {/* 3-dot menu button - far right, always visible */}
+                      <div data-menu style={{ position: 'relative', justifySelf: 'end' }}>
+                        <button
+                          {...listeners}
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            setOpenMenuId(openMenuId === habit.id ? null : habit.id);
+                          }}
+                          style={{
+                            background: 'transparent',
+                            border: 'none',
+                            color: openMenuId === habit.id ? '#00ff41' : isDragging ? '#00ff41' : '#666',
+                            cursor: isDragging ? 'grabbing' : 'pointer',
+                            fontFamily: 'inherit',
+                            fontSize: '16px',
+                            padding: '4px 8px',
+                            lineHeight: 1,
+                            transition: 'all 0.15s',
+                            touchAction: 'none'
+                          }}
+                          onMouseEnter={e => e.target.style.color = '#00ff41'}
+                          onMouseLeave={e => { if (openMenuId !== habit.id && !isDragging) e.target.style.color = '#666'; }}
+                          title="Menu"
+                        >
+                          ⋮
+                        </button>
+
+                        {/* Dropdown menu */}
+                        {openMenuId === habit.id && (
+                          <div
+                            style={{
+                              position: 'absolute',
+                              top: '100%',
+                              right: 0,
+                              backgroundColor: '#111',
+                              border: '1px solid #333',
+                              borderRadius: '4px',
+                              zIndex: 1000,
+                              minWidth: '100px',
+                              boxShadow: '0 4px 12px rgba(0,0,0,0.7)',
+                              overflow: 'hidden'
+                            }}
+                            onClick={e => e.stopPropagation()}
+                          >
+                            <button
+                              onClick={() => {
+                                startEditHabit(habit);
+                                setOpenMenuId(null);
+                              }}
+                              style={{
+                                display: 'block',
+                                width: '100%',
+                                padding: '10px 14px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#aaa',
+                                cursor: 'pointer',
+                                fontFamily: 'inherit',
+                                fontSize: '12px',
+                                textAlign: 'left',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={e => {
+                                e.target.style.backgroundColor = 'rgba(0,255,65,0.15)';
+                                e.target.style.color = '#00ff41';
+                              }}
+                              onMouseLeave={e => {
+                                e.target.style.backgroundColor = 'transparent';
+                                e.target.style.color = '#aaa';
+                              }}
+                            >
+                              Edit
+                            </button>
+                            <button
+                              onClick={() => {
+                                setConfirmingDeleteId(habit.id);
+                                setOpenMenuId(null);
+                              }}
+                              style={{
+                                display: 'block',
+                                width: '100%',
+                                padding: '10px 14px',
+                                background: 'transparent',
+                                border: 'none',
+                                color: '#aaa',
+                                cursor: 'pointer',
+                                fontFamily: 'inherit',
+                                fontSize: '12px',
+                                textAlign: 'left',
+                                transition: 'all 0.15s'
+                              }}
+                              onMouseEnter={e => {
+                                e.target.style.backgroundColor = 'rgba(255,68,68,0.15)';
+                                e.target.style.color = '#ff4444';
+                              }}
+                              onMouseLeave={e => {
+                                e.target.style.backgroundColor = 'transparent';
+                                e.target.style.color = '#aaa';
+                              }}
+                            >
+                              Delete
+                            </button>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+
+                    {/* Desktop delete confirmation overlay */}
+                    {confirmingDeleteId === habit.id && (
+                      <div style={{
+                        position: 'absolute',
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        bottom: 0,
+                        backgroundColor: 'rgba(10,10,10,0.95)',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        gap: '10px',
+                        zIndex: 50
+                      }}
+                      onClick={e => e.stopPropagation()}
+                      >
+                        <span style={{ color: '#888', fontSize: '12px', marginRight: '8px' }}>
+                          Delete "{habit.name}"?
+                        </span>
+                        <button
+                          onClick={() => setConfirmingDeleteId(null)}
+                          style={{
+                            background: 'transparent',
+                            border: '1px solid #444',
+                            color: '#888',
+                            padding: '6px 12px',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            fontSize: '11px',
+                            borderRadius: '3px'
+                          }}
+                        >
+                          Cancel
+                        </button>
+                        <button
+                          onClick={() => {
+                            deleteHabit(habit.id);
+                            setConfirmingDeleteId(null);
+                          }}
+                          style={{
+                            background: 'rgba(255,68,68,0.1)',
+                            border: '1px solid #ff4444',
+                            color: '#ff4444',
+                            padding: '6px 12px',
+                            cursor: 'pointer',
+                            fontFamily: 'inherit',
+                            fontSize: '11px',
+                            borderRadius: '3px'
+                          }}
+                        >
+                          Delete
+                        </button>
+                      </div>
+                    )}
+                  </>
                 )}
               </div>
+                )}
+              </SortableItem>
             ))}
+                </SortableContext>
+              </DndContext>
             </>
           )}
         </div>
@@ -2491,6 +2771,101 @@ const HabitTracker = () => {
                 </div>
               </div>
 
+              {/* Time field with toggle */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ color: '#666', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
+                  TIME
+                </div>
+                <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px' }}>
+                  <input
+                    type="time"
+                    value={newHabitTime}
+                    onChange={(e) => setNewHabitTime(e.target.value)}
+                    disabled={!newHabitTime}
+                    style={{
+                      padding: '10px 12px',
+                      backgroundColor: '#0a0a0a',
+                      border: '1px solid #333',
+                      color: newHabitTime ? '#fff' : '#444',
+                      fontFamily: 'inherit',
+                      fontSize: '14px',
+                      outline: 'none',
+                      colorScheme: 'dark',
+                      opacity: newHabitTime ? 1 : 0.5
+                    }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <button
+                      onClick={() => setNewHabitTime(newHabitTime || '09:00')}
+                      style={{
+                        background: newHabitTime ? 'rgba(0,255,65,0.2)' : 'transparent',
+                        border: `1px solid ${newHabitTime ? '#00ff41' : '#444'}`,
+                        color: newHabitTime ? '#00ff41' : '#666',
+                        padding: '3px 8px',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: '9px',
+                        borderRadius: '2px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      ON
+                    </button>
+                    <button
+                      onClick={() => setNewHabitTime('')}
+                      style={{
+                        background: !newHabitTime ? 'rgba(255,255,255,0.1)' : 'transparent',
+                        border: `1px solid ${!newHabitTime ? '#666' : '#444'}`,
+                        color: !newHabitTime ? '#888' : '#555',
+                        padding: '3px 8px',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: '9px',
+                        borderRadius: '2px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      OFF
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Days selector */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ color: '#666', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
+                  DAYS
+                </div>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        const newDays = newHabitDays.includes(i)
+                          ? newHabitDays.filter(d => d !== i)
+                          : [...newHabitDays, i].sort();
+                        // Don't allow empty selection
+                        if (newDays.length > 0) setNewHabitDays(newDays);
+                      }}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        backgroundColor: newHabitDays.includes(i) ? 'rgba(0,255,65,0.15)' : 'transparent',
+                        border: `1px solid ${newHabitDays.includes(i) ? '#00ff41' : '#333'}`,
+                        color: newHabitDays.includes(i) ? '#00ff41' : '#666',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: '11px',
+                        borderRadius: '4px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={addHabit}
@@ -2516,6 +2891,8 @@ const HabitTracker = () => {
                     setShowAddModal(false);
                     setNewHabitName('');
                     setNewHabitGoal(1);
+                    setNewHabitTime('');
+                    setNewHabitDays([0,1,2,3,4,5,6]);
                   }}
                   style={{
                     flex: 1,
@@ -2608,6 +2985,101 @@ const HabitTracker = () => {
                 </div>
               </div>
 
+              {/* Time field with toggle */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ color: '#666', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
+                  TIME
+                </div>
+                <div style={{ display: 'flex', alignItems: 'stretch', gap: '8px' }}>
+                  <input
+                    type="time"
+                    value={editHabitTime}
+                    onChange={(e) => setEditHabitTime(e.target.value)}
+                    disabled={!editHabitTime}
+                    style={{
+                      padding: '10px 12px',
+                      backgroundColor: '#0a0a0a',
+                      border: '1px solid #333',
+                      color: editHabitTime ? '#fff' : '#444',
+                      fontFamily: 'inherit',
+                      fontSize: '14px',
+                      outline: 'none',
+                      colorScheme: 'dark',
+                      opacity: editHabitTime ? 1 : 0.5
+                    }}
+                  />
+                  <div style={{ display: 'flex', flexDirection: 'column', justifyContent: 'space-between' }}>
+                    <button
+                      onClick={() => setEditHabitTime(editHabitTime || '09:00')}
+                      style={{
+                        background: editHabitTime ? 'rgba(0,255,65,0.2)' : 'transparent',
+                        border: `1px solid ${editHabitTime ? '#00ff41' : '#444'}`,
+                        color: editHabitTime ? '#00ff41' : '#666',
+                        padding: '3px 8px',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: '9px',
+                        borderRadius: '2px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      ON
+                    </button>
+                    <button
+                      onClick={() => setEditHabitTime('')}
+                      style={{
+                        background: !editHabitTime ? 'rgba(255,255,255,0.1)' : 'transparent',
+                        border: `1px solid ${!editHabitTime ? '#666' : '#444'}`,
+                        color: !editHabitTime ? '#888' : '#555',
+                        padding: '3px 8px',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: '9px',
+                        borderRadius: '2px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      OFF
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Days selector */}
+              <div style={{ marginBottom: '16px' }}>
+                <div style={{ color: '#666', fontSize: '10px', marginBottom: '6px', letterSpacing: '1px' }}>
+                  DAYS
+                </div>
+                <div style={{ display: 'flex', gap: '4px' }}>
+                  {['S', 'M', 'T', 'W', 'T', 'F', 'S'].map((day, i) => (
+                    <button
+                      key={i}
+                      onClick={() => {
+                        const newDays = editHabitDays.includes(i)
+                          ? editHabitDays.filter(d => d !== i)
+                          : [...editHabitDays, i].sort();
+                        // Don't allow empty selection
+                        if (newDays.length > 0) setEditHabitDays(newDays);
+                      }}
+                      style={{
+                        width: '32px',
+                        height: '32px',
+                        backgroundColor: editHabitDays.includes(i) ? 'rgba(0,255,65,0.15)' : 'transparent',
+                        border: `1px solid ${editHabitDays.includes(i) ? '#00ff41' : '#333'}`,
+                        color: editHabitDays.includes(i) ? '#00ff41' : '#666',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: '11px',
+                        borderRadius: '4px',
+                        transition: 'all 0.15s'
+                      }}
+                    >
+                      {day}
+                    </button>
+                  ))}
+                </div>
+              </div>
+
               <div style={{ display: 'flex', gap: '8px' }}>
                 <button
                   onClick={updateHabit}
@@ -2633,6 +3105,8 @@ const HabitTracker = () => {
                     setEditingHabit(null);
                     setEditHabitName('');
                     setEditHabitGoal(1);
+                    setEditHabitTime('');
+                    setEditHabitDays([0,1,2,3,4,5,6]);
                   }}
                   style={{
                     flex: 1,
