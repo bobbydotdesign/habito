@@ -22,10 +22,10 @@ import {
 } from '../services/notifications';
 import { useHagotchi } from '../hooks/useHagotchi';
 import {
-  HagotchiCompanion,
   SkinCollection,
   UnlockAnimation,
-  LoreArchive
+  LoreArchive,
+  Onboarding
 } from './hagotchi';
 
 // Design tokens - edit these to change the app's color scheme
@@ -139,8 +139,8 @@ const HabitTracker = () => {
   // Hagotchi companion state
   const [showSkinCollection, setShowSkinCollection] = useState(false);
   const [showLoreArchive, setShowLoreArchive] = useState(false);
-  const [feedingAnimation, setFeedingAnimation] = useState(false);
-  const [lastVitalityGain, setLastVitalityGain] = useState(0);
+  const [headerCollapsed, setHeaderCollapsed] = useState(false);
+  const contentRef = useRef(null);
 
   // Handle responsive layout
   useEffect(() => {
@@ -148,6 +148,26 @@ const HabitTracker = () => {
     window.addEventListener('resize', handleResize);
     return () => window.removeEventListener('resize', handleResize);
   }, []);
+
+  // Handle scroll for header collapse (mobile only) with hysteresis to prevent flickering
+  const handleContentScroll = (e) => {
+    if (isMobile) {
+      const scrollTop = e.target.scrollTop;
+      // Show compact header after hero is mostly scrolled away (~280px), hide when near top
+      if (!headerCollapsed && scrollTop > 280) {
+        setHeaderCollapsed(true);
+      } else if (headerCollapsed && scrollTop < 50) {
+        setHeaderCollapsed(false);
+      }
+    }
+  };
+
+  // Reset header collapse when switching away from mobile
+  useEffect(() => {
+    if (!isMobile) {
+      setHeaderCollapsed(false);
+    }
+  }, [isMobile]);
 
   // Toggle body class for mobile overflow handling
   useEffect(() => {
@@ -530,12 +550,21 @@ const HabitTracker = () => {
   const {
     spirit,
     currentSkin,
-    feedSpirit,
-    updateStreak,
+    getTotalHearts,
+    updateHearts,
+    recordHabitCompletion,
+    finalizeDay,
     switchSkin,
+    setCustomName,
+    getStatsForSkin,
+    showOnboarding,
+    createSpirit,
+    completeOnboarding,
     pendingUnlock,
     showUnlockAnimation,
-    closeUnlockAnimation
+    closeUnlockAnimation,
+    encouragementMessage,
+    clearEncouragement,
   } = useHagotchi(user?.id);
 
   // Date navigation helpers - use local date to avoid timezone issues
@@ -1119,14 +1148,10 @@ const HabitTracker = () => {
       // Record to completions table for activity tracking
       await recordCompletion(id, newCompletions, dailyGoal);
 
-      // Feed the Hagotchi spirit when completing a habit (not un-completing)
+      // Record stats for Hagotchi when completing a habit (not un-completing)
       if (!wasCompleted && nowCompleted) {
-        const result = await feedSpirit(newStreak);
-        if (result) {
-          setLastVitalityGain(result.vitalityGain);
-          setFeedingAnimation(true);
-          setTimeout(() => setFeedingAnimation(false), 1500);
-        }
+        const isFirstEver = newStreak === 1;
+        await recordHabitCompletion(newStreak, isFirstEver);
       }
     }
     setSyncing(false);
@@ -1335,6 +1360,13 @@ const HabitTracker = () => {
     }
     prevCompletionPercentRef.current = completionPercent;
   }, [completionPercent, habitsForSelectedDate.length, isToday]);
+
+  // Update Hagotchi hearts when completion percentage changes (today only)
+  useEffect(() => {
+    if (!isToday || habitsForSelectedDate.length === 0) return;
+    // updateHearts handles encouragement messages, coins, and unlock checks
+    updateHearts(completionPercent, habitsForSelectedDate.length, completedCount);
+  }, [completionPercent, isToday, habitsForSelectedDate.length, completedCount, updateHearts]);
 
   const generateProgressBar = (percent, width = 20) => {
     const filled = Math.round((percent / 100) * width);
@@ -1680,7 +1712,7 @@ const HabitTracker = () => {
         zIndex: 999
       }} />
 
-      {/* Header Container - flex item at top on mobile */}
+      {/* Fixed Compact Header - Only visible when scrolled on mobile */}
       <div
         className={isMobile ? 'mobile-header' : ''}
         style={{
@@ -1690,222 +1722,579 @@ const HabitTracker = () => {
             marginBottom: '24px',
           }),
           backgroundColor: '#0a0a0a',
-          boxShadow: isMobile ? '0 2px 12px rgba(0,0,0,0.6)' : 'none',
+          boxShadow: isMobile ? '0 4px 20px rgba(0,0,0,0.8)' : 'none',
+          borderBottom: '1px solid #1a1a1a',
+          // Hide fixed header on mobile when not scrolled (hero is visible)
+          ...(isMobile && {
+            transform: headerCollapsed ? 'translateY(0)' : 'translateY(-100%)',
+            opacity: headerCollapsed ? 1 : 0,
+            transition: 'transform 0.25s ease, opacity 0.25s ease',
+          }),
         }}>
-        <div style={{ maxWidth: '700px', margin: '0 auto', padding: isMobile ? '8px 20px' : '0' }}>
-          {/* Top row: Logo on left, Menu on right */}
-          <div style={{
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            marginBottom: isMobile ? '8px' : '12px'
-          }}>
-            {/* Logo on left */}
-            <div style={{ display: 'inline-flex', alignItems: 'flex-end' }}>
-              <pre style={{
-                color: '#00ff41',
-                fontSize: isMobile ? '5px' : '10px',
-                lineHeight: '1.2',
-                margin: 0,
-                textShadow: '0 0 10px #00ff41'
-              }}>
-{`
- ██╗  ██╗ █████╗  ██████╗  ██████╗ ████████╗ ██████╗██╗  ██╗██╗
- ██║  ██║██╔══██╗██╔════╝ ██╔═══██╗╚══██╔══╝██╔════╝██║  ██║██║
- ███████║███████║██║  ███╗██║   ██║   ██║   ██║     ███████║██║
- ██╔══██║██╔══██║██║   ██║██║   ██║   ██║   ██║     ██╔══██║██║
- ██║  ██║██║  ██║╚██████╔╝╚██████╔╝   ██║   ╚██████╗██║  ██║██║
- ╚═╝  ╚═╝╚═╝  ╚═╝ ╚═════╝  ╚═════╝    ╚═╝    ╚═════╝╚═╝  ╚═╝╚═╝`}
-              </pre>
-            </div>
 
-            {/* Mobile: More menu button in header */}
-            {isMobile && (
-              <button
-                onClick={() => setShowMobileMenu(true)}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #333',
-                  color: '#fff',
-                  padding: '6px 10px',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  fontSize: '14px',
-                  lineHeight: 1,
-                }}
-              >
-                ⋮
-              </button>
+        {selectedView === 'today' && spirit && currentSkin ? (
+          <>
+            {/* COMPACT HEADER - Always rendered in fixed header (hidden when hero visible on mobile) */}
+            {(
+              <div style={{ maxWidth: '700px', margin: '0 auto', padding: isMobile ? '10px 16px' : '16px 0' }}>
+                <div
+                  onClick={() => setShowSkinCollection(true)}
+                  style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: isMobile ? '12px' : '20px',
+                    cursor: 'pointer',
+                    position: 'relative',
+                  }}
+                >
+                  {/* Character */}
+                  <div style={{ position: 'relative', flexShrink: 0 }}>
+                    <div style={{
+                      position: 'absolute',
+                      top: '50%',
+                      left: '50%',
+                      transform: 'translate(-50%, -50%)',
+                      width: isMobile ? '52px' : '56px',
+                      height: isMobile ? '52px' : '56px',
+                      borderRadius: '50%',
+                      background: getTotalHearts(completionPercent) >= 2.5
+                        ? 'radial-gradient(circle, rgba(0,255,65,0.2) 0%, transparent 70%)'
+                        : 'radial-gradient(circle, rgba(0,255,65,0.08) 0%, transparent 70%)',
+                    }} />
+                    <img
+                      src={currentSkin.image}
+                      alt={currentSkin.name}
+                      style={{
+                        width: isMobile ? '40px' : '44px',
+                        height: isMobile ? '40px' : '44px',
+                        imageRendering: 'pixelated',
+                        position: 'relative',
+                        zIndex: 1,
+                        filter: 'drop-shadow(0 0 4px rgba(0,255,65,0.3))',
+                      }}
+                    />
+                  </div>
+
+                  {/* Stats */}
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    {/* Name + Hearts (first emphasized) + Count */}
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                      <span style={{ fontSize: isMobile ? '12px' : '11px', color: '#fff', fontWeight: '500' }}>
+                        {currentSkin.name}
+                      </span>
+                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                        {[0, 1, 2].map(i => {
+                          const hearts = getTotalHearts(completionPercent);
+                          const fill = Math.max(0, Math.min(1, hearts - i));
+                          const isToday = i === 0;
+                          const isPartiallyFilled = fill > 0 && fill < 1;
+                          return (
+                            <svg
+                              key={i}
+                              viewBox="0 0 24 22"
+                              style={{
+                                width: isToday ? '20px' : '12px',
+                                height: isToday ? '18px' : '11px',
+                                filter: isToday && isPartiallyFilled
+                                  ? 'drop-shadow(0 0 4px rgba(0, 255, 65, 0.5))'
+                                  : fill >= 1
+                                    ? 'drop-shadow(0 0 3px rgba(0, 255, 65, 0.6))'
+                                    : 'none',
+                              }}
+                            >
+                              <path
+                                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                                fill="none"
+                                stroke={fill <= 0 ? '#333' : '#00ff41'}
+                                strokeWidth="1.5"
+                              />
+                              <path
+                                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                                fill="#00ff41"
+                                style={{ clipPath: `inset(${(1 - fill) * 100}% 0 0 0)` }}
+                              />
+                            </svg>
+                          );
+                        })}
+                      </div>
+                      <span style={{
+                        fontSize: '11px',
+                        color: completionPercent === 100 ? '#00ff41' : '#888',
+                        fontWeight: completionPercent === 100 ? 'bold' : 'normal',
+                      }}>
+                        {completedCount}/{habitsForSelectedDate.length}
+                      </span>
+                    </div>
+                  </div>
+
+                  {/* Coins + Menu */}
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <div style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '3px',
+                      padding: '3px 6px',
+                      backgroundColor: 'rgba(255, 170, 0, 0.08)',
+                      border: '1px solid rgba(255, 170, 0, 0.2)',
+                      borderRadius: '4px',
+                    }}>
+                      <span style={{ fontSize: '9px', color: '#ffaa00' }}>●</span>
+                      <span style={{ fontSize: '10px', color: '#ffaa00', fontWeight: 'bold', fontFamily: 'monospace' }}>
+                        {spirit.coins || 0}
+                      </span>
+                    </div>
+                    {isMobile && (
+                      <button
+                        onClick={(e) => { e.stopPropagation(); setShowMobileMenu(true); }}
+                        style={{
+                          background: 'transparent',
+                          border: '1px solid #333',
+                          color: '#666',
+                          padding: '4px 8px',
+                          cursor: 'pointer',
+                          fontFamily: 'inherit',
+                          fontSize: '12px',
+                          lineHeight: 1,
+                        }}
+                      >
+                        ⋮
+                      </button>
+                    )}
+                    {!isMobile && (
+                      <>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); setShowSettings(true); }}
+                          style={{ background: 'transparent', border: '1px solid #333', color: '#666', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px' }}
+                        >
+                          [SETTINGS]
+                        </button>
+                        <button
+                          onClick={(e) => { e.stopPropagation(); signOut(); }}
+                          style={{ background: 'transparent', border: '1px solid #333', color: '#666', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px' }}
+                        >
+                          [LOGOUT]
+                        </button>
+                      </>
+                    )}
+                  </div>
+
+                  {/* Encouragement bubble - compact */}
+                  {encouragementMessage && headerCollapsed && (
+                    <div style={{
+                      position: 'absolute',
+                      top: '100%',
+                      left: isMobile ? '50px' : '60px',
+                      marginTop: '6px',
+                      maxWidth: 'calc(100% - 80px)',
+                      padding: '6px 28px 6px 10px',
+                      backgroundColor: '#0a0a0a',
+                      border: '1px solid #00ff41',
+                      borderRadius: '6px',
+                      zIndex: 100,
+                      animation: 'headerFadeIn 0.3s ease-out',
+                    }}>
+                      <p style={{ fontSize: '10px', color: '#00ff41', margin: 0, lineHeight: 1.3 }}>
+                        {encouragementMessage}
+                      </p>
+                      {/* Dismiss X */}
+                      <button
+                        onClick={(e) => {
+                          e.stopPropagation();
+                          clearEncouragement();
+                        }}
+                        style={{
+                          position: 'absolute',
+                          top: '2px',
+                          right: '4px',
+                          background: 'transparent',
+                          border: 'none',
+                          color: '#00ff41',
+                          fontSize: '14px',
+                          cursor: 'pointer',
+                          padding: '2px 6px',
+                          lineHeight: 1,
+                          opacity: 0.6,
+                        }}
+                      >
+                        ×
+                      </button>
+                      <div style={{
+                        position: 'absolute',
+                        top: '-5px',
+                        left: '16px',
+                        width: 0,
+                        height: 0,
+                        borderLeft: '5px solid transparent',
+                        borderRight: '5px solid transparent',
+                        borderBottom: '5px solid #00ff41',
+                      }} />
+                    </div>
+                  )}
+                </div>
+              </div>
             )}
-          </div>
-
-          {/* Status bar */}
-          <div style={{
-            borderTop: '1px solid #333',
-            borderBottom: '1px solid #333',
-            padding: isMobile ? '8px 0' : '10px 0',
-            display: 'flex',
-            justifyContent: 'space-between',
-            alignItems: 'center',
-            fontSize: isMobile ? '10px' : '12px'
-          }}>
-            <span style={{ color: '#fff' }}>
-              {new Date().toLocaleDateString('en-US', {
-                weekday: isMobile ? 'short' : 'long',
-                month: 'short',
-                day: 'numeric'
-              }).toUpperCase()}
-            </span>
-            <div style={{ display: 'flex', alignItems: 'center', gap: isMobile ? '8px' : '12px' }}>
-              {syncing && (
-                <span style={{ color: '#ffaa00', fontSize: '10px' }}>
-                  SYNCING...
+          </>
+        ) : (
+          /* Fallback header when not on Today view or no spirit */
+          <div style={{ maxWidth: '700px', margin: '0 auto', padding: isMobile ? '12px 16px' : '16px 0' }}>
+            <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '12px' }}>
+                <span style={{ fontSize: isMobile ? '14px' : '13px', color: '#00ff41', fontWeight: 'bold', letterSpacing: '2px' }}>
+                  HAGOTCHI
                 </span>
-              )}
-              {!isMobile && (
-                <>
+                <span style={{ fontSize: '10px', color: '#555', textTransform: 'uppercase' }}>
+                  {selectedView === 'activity' ? 'Activity' : formatDateLabel(selectedDate)}
+                </span>
+              </div>
+              <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                {syncing && <span style={{ color: '#ffaa00', fontSize: '9px' }}>SYNC</span>}
+                {isMobile ? (
                   <button
-                    onClick={() => setShowSettings(true)}
-                    style={{
-                      background: 'transparent',
-                      border: '1px solid #333',
-                      color: '#fff',
-                      padding: '4px 8px',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      fontSize: '9px',
-                      letterSpacing: '0.5px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.borderColor = '#00ff41';
-                      e.target.style.color = '#00ff41';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.borderColor = '#333';
-                      e.target.style.color = '#888';
-                    }}
+                    onClick={() => setShowMobileMenu(true)}
+                    style={{ background: 'transparent', border: '1px solid #333', color: '#666', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '12px' }}
                   >
-                    [SETTINGS]
+                    ⋮
                   </button>
-                  <button
-                    onClick={(e) => {
-                      e.preventDefault();
-                      e.stopPropagation();
-                      signOut();
-                    }}
-                    style={{
-                      background: 'transparent',
-                      border: '1px solid #333',
-                      color: '#fff',
-                      padding: '4px 8px',
-                      cursor: 'pointer',
-                      fontFamily: 'inherit',
-                      fontSize: '9px',
-                      letterSpacing: '0.5px'
-                    }}
-                    onMouseEnter={(e) => {
-                      e.target.style.borderColor = '#ff4444';
-                      e.target.style.color = '#ff4444';
-                    }}
-                    onMouseLeave={(e) => {
-                      e.target.style.borderColor = '#333';
-                      e.target.style.color = '#888';
-                    }}
-                  >
-                    [LOGOUT]
-                  </button>
-                </>
-              )}
-              <span style={{ color: '#00ff41', fontSize: isMobile ? '9px' : '12px' }}>
-                {cursorBlink ? '●' : '○'} ONLINE
-              </span>
+                ) : (
+                  <>
+                    <button onClick={() => setShowSettings(true)} style={{ background: 'transparent', border: '1px solid #333', color: '#666', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px' }}>[SETTINGS]</button>
+                    <button onClick={signOut} style={{ background: 'transparent', border: '1px solid #333', color: '#666', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px' }}>[LOGOUT]</button>
+                  </>
+                )}
+              </div>
             </div>
           </div>
-
-          {/* Progress Bar */}
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: isMobile ? '8px' : '10px',
-            padding: isMobile ? '8px 0 4px' : '10px 0 4px',
-            fontSize: isMobile ? '11px' : '12px',
-          }}>
-            {/* Left bracket + percentage */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              flexShrink: 0,
-            }}>
-              <span style={{ color: '#555', fontSize: isMobile ? '10px' : '11px' }}>├</span>
-              <span style={{
-                color: completionPercent === 100 ? '#00ff41' : '#888',
-                fontWeight: 'bold',
-                fontSize: isMobile ? '11px' : '13px',
-                textShadow: completionPercent === 100 ? '0 0 8px #00ff41' : 'none',
-                minWidth: isMobile ? '32px' : '38px',
-              }}>
-                {completionPercent}%
-              </span>
-            </div>
-
-            {/* Progress bar - flexes to fill with block pattern */}
-            <div style={{
-              flex: 1,
-              height: isMobile ? '10px' : '12px',
-              backgroundColor: '#222',
-              borderRadius: '1px',
-              overflow: 'hidden',
-              position: 'relative',
-            }}>
-              <div style={{
-                width: `${completionPercent}%`,
-                height: '100%',
-                backgroundColor: completionPercent === 100 ? '#00ff41' : '#555',
-                boxShadow: completionPercent === 100 ? '0 0 8px #00ff41' : 'none',
-                transition: 'width 0.3s ease',
-                // Segmented block pattern
-                backgroundImage: `repeating-linear-gradient(
-                  90deg,
-                  transparent,
-                  transparent 4px,
-                  #0a0a0a 4px,
-                  #0a0a0a 5px
-                )`,
-                backgroundSize: '5px 100%',
-              }} />
-            </div>
-
-            {/* Right: Task count + bracket */}
-            <div style={{
-              display: 'flex',
-              alignItems: 'center',
-              gap: '6px',
-              flexShrink: 0,
-            }}>
-              <span style={{
-                color: completionPercent === 100 ? '#00ff41' : '#666',
-                fontSize: isMobile ? '10px' : '11px',
-                textShadow: completionPercent === 100 ? '0 0 6px #00ff41' : 'none',
-              }}>
-                {completedCount}/{habitsForSelectedDate.length}
-              </span>
-              <span style={{
-                color: completionPercent === 100 ? '#00ff41' : '#555',
-                fontSize: isMobile ? '9px' : '10px',
-                letterSpacing: '1px',
-                textShadow: completionPercent === 100 ? '0 0 6px #00ff41' : 'none',
-              }}>
-                {completionPercent === 100 ? '✓' : 'TODO'}
-              </span>
-              <span style={{ color: '#555', fontSize: isMobile ? '10px' : '11px' }}>┤</span>
-            </div>
-          </div>
-        </div>
+        )}
       </div>
 
+      {/* Header keyframe animations */}
+      <style>
+        {`
+          @keyframes headerGlow {
+            0%, 100% { opacity: 0.8; transform: translate(-50%, -50%) scale(1); }
+            50% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+          }
+          @keyframes headerPulse {
+            0%, 100% { opacity: 0.6; }
+            50% { opacity: 1; }
+          }
+          @keyframes headerFadeIn {
+            from { opacity: 0; transform: translateY(-4px); }
+            to { opacity: 1; transform: translateY(0); }
+          }
+        `}
+      </style>
+
       {/* Scrollable content area for mobile */}
-      <div className={isMobile ? 'mobile-content' : ''} style={isMobile ? { paddingLeft: '20px', paddingRight: '20px' } : undefined}>
+      <div
+        ref={contentRef}
+        className={isMobile ? 'mobile-content' : ''}
+        onScroll={isMobile ? handleContentScroll : undefined}
+        style={isMobile ? {
+          paddingLeft: '20px',
+          paddingRight: '20px',
+          // Override CSS padding-top - just safe area, Hagotchi at top
+          paddingTop: 'env(safe-area-inset-top, 0px)',
+        } : undefined}
+      >
+        {/* EXPANDED HERO - Scrollable, shows at top before scrolling */}
+        {isMobile && selectedView === 'today' && spirit && currentSkin && (
+          <div
+            style={{
+              padding: '12px 0 16px',
+              position: 'relative',
+              marginBottom: '16px',
+            }}
+          >
+            {/* Top bar: Date + Coins + Menu */}
+            <div style={{
+              display: 'flex',
+              justifyContent: 'space-between',
+              alignItems: 'center',
+              marginBottom: '12px',
+            }}>
+              <span style={{
+                fontSize: '10px',
+                color: '#666',
+                letterSpacing: '1px',
+                textTransform: 'uppercase',
+              }}>
+                {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
+              </span>
+
+              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                {/* Coins */}
+                <div style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '4px',
+                  padding: '4px 10px',
+                  backgroundColor: 'rgba(255, 170, 0, 0.08)',
+                  border: '1px solid rgba(255, 170, 0, 0.2)',
+                  borderRadius: '12px',
+                }}>
+                  <span style={{ fontSize: '11px', color: '#ffaa00' }}>●</span>
+                  <span style={{
+                    fontSize: '12px',
+                    color: '#ffaa00',
+                    fontWeight: 'bold',
+                    fontFamily: 'monospace',
+                  }}>
+                    {spirit.coins || 0}
+                  </span>
+                </div>
+
+                {/* Menu */}
+                <button
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    setShowMobileMenu(true);
+                  }}
+                  style={{
+                    background: 'transparent',
+                    border: '1px solid #333',
+                    color: '#666',
+                    padding: '6px 10px',
+                    cursor: 'pointer',
+                    fontFamily: 'inherit',
+                    fontSize: '14px',
+                    lineHeight: 1,
+                    borderRadius: '4px',
+                  }}
+                >
+                  ⋮
+                </button>
+              </div>
+            </div>
+
+            {/* Large centered character - clickable for collection */}
+            <div
+              onClick={() => setShowSkinCollection(true)}
+              style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                position: 'relative',
+                cursor: 'pointer',
+              }}
+            >
+              {/* Speech bubble above character */}
+              {encouragementMessage && (
+                <div style={{
+                  position: 'relative',
+                  marginBottom: '8px',
+                  maxWidth: '260px',
+                }}>
+                  <div style={{
+                    padding: '8px 28px 8px 12px',
+                    backgroundColor: 'rgba(0, 255, 65, 0.08)',
+                    border: '1px solid rgba(0, 255, 65, 0.4)',
+                    borderRadius: '8px',
+                    position: 'relative',
+                  }}>
+                    <p style={{
+                      fontSize: '11px',
+                      color: '#00ff41',
+                      margin: 0,
+                      lineHeight: 1.4,
+                      textAlign: 'center',
+                    }}>
+                      "{encouragementMessage}"
+                    </p>
+                    {/* Dismiss X */}
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        clearEncouragement();
+                      }}
+                      style={{
+                        position: 'absolute',
+                        top: '4px',
+                        right: '4px',
+                        background: 'transparent',
+                        border: 'none',
+                        color: '#00ff41',
+                        fontSize: '14px',
+                        cursor: 'pointer',
+                        padding: '2px 6px',
+                        lineHeight: 1,
+                        opacity: 0.6,
+                      }}
+                    >
+                      ×
+                    </button>
+                  </div>
+                  {/* Speech bubble tail */}
+                  <div style={{
+                    position: 'absolute',
+                    bottom: '-6px',
+                    left: '50%',
+                    transform: 'translateX(-50%)',
+                    width: 0,
+                    height: 0,
+                    borderLeft: '6px solid transparent',
+                    borderRight: '6px solid transparent',
+                    borderTop: '6px solid rgba(0, 255, 65, 0.4)',
+                  }} />
+                </div>
+              )}
+
+              {/* Glow ring */}
+              <div style={{
+                position: 'absolute',
+                top: encouragementMessage ? '70px' : '0',
+                width: '140px',
+                height: '140px',
+                borderRadius: '50%',
+                background: getTotalHearts(completionPercent) >= 2.5
+                  ? 'radial-gradient(circle, rgba(0,255,65,0.25) 0%, transparent 70%)'
+                  : 'radial-gradient(circle, rgba(0,255,65,0.08) 0%, transparent 70%)',
+                animation: getTotalHearts(completionPercent) >= 2.5 ? 'headerGlow 2s ease-in-out infinite' : 'none',
+              }} />
+
+              {/* Character */}
+              <img
+                src={currentSkin.image}
+                alt={currentSkin.name}
+                style={{
+                  width: '100px',
+                  height: '100px',
+                  imageRendering: 'pixelated',
+                  position: 'relative',
+                  zIndex: 1,
+                  filter: getTotalHearts(completionPercent) >= 2.5
+                    ? 'drop-shadow(0 0 16px rgba(0,255,65,0.6))'
+                    : 'drop-shadow(0 0 8px rgba(0,255,65,0.3))',
+                  marginBottom: '12px',
+                }}
+              />
+
+              {/* Name + Rarity */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '8px',
+                marginBottom: '16px',
+              }}>
+                <span style={{
+                  fontSize: '16px',
+                  color: '#fff',
+                  fontWeight: '600',
+                  letterSpacing: '1px',
+                }}>
+                  {currentSkin.name}
+                </span>
+                <span style={{
+                  fontSize: '9px',
+                  color: (() => {
+                    const colors = { common: '#888', uncommon: '#4ade80', rare: '#60a5fa', epic: '#c084fc', legendary: '#fbbf24' };
+                    return colors[currentSkin.rarity] || '#888';
+                  })(),
+                  textTransform: 'uppercase',
+                  letterSpacing: '0.5px',
+                  padding: '3px 6px',
+                  border: `1px solid ${(() => {
+                    const colors = { common: '#333', uncommon: '#4ade8040', rare: '#60a5fa40', epic: '#c084fc40', legendary: '#fbbf2440' };
+                    return colors[currentSkin.rarity] || '#333';
+                  })()}`,
+                  borderRadius: '4px',
+                }}>
+                  {currentSkin.rarity}
+                </span>
+              </div>
+
+              {/* Hearts - First heart emphasized as TODAY indicator */}
+              <div style={{
+                display: 'flex',
+                alignItems: 'flex-end',
+                gap: '6px',
+                marginBottom: '12px',
+              }}>
+                {[0, 1, 2].map(i => {
+                  const hearts = getTotalHearts(completionPercent);
+                  const fill = Math.max(0, Math.min(1, hearts - i));
+                  const isFull = fill >= 1;
+                  const isEmpty = fill <= 0;
+                  const isToday = i === 0;
+                  const isPartiallyFilled = fill > 0 && fill < 1;
+
+                  return (
+                    <div key={i} style={{
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      gap: '4px',
+                    }}>
+                      <svg
+                        viewBox="0 0 24 22"
+                        style={{
+                          width: isToday ? '44px' : '24px',
+                          height: isToday ? '40px' : '22px',
+                          filter: isToday && isPartiallyFilled
+                            ? 'drop-shadow(0 0 8px rgba(0, 255, 65, 0.5))'
+                            : isFull
+                              ? 'drop-shadow(0 0 6px rgba(0, 255, 65, 0.8))'
+                              : 'none',
+                          transition: 'filter 0.3s ease',
+                        }}
+                      >
+                        <path
+                          d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                          fill="none"
+                          stroke={isEmpty ? '#333' : '#00ff41'}
+                          strokeWidth={isToday ? '1.2' : '1.5'}
+                        />
+                        <path
+                          d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                          fill="#00ff41"
+                          style={{
+                            clipPath: `inset(${(1 - fill) * 100}% 0 0 0)`,
+                          }}
+                        />
+                      </svg>
+                      {isToday && (
+                        <span style={{
+                          fontSize: '8px',
+                          color: isPartiallyFilled ? '#00ff41' : '#555',
+                          textTransform: 'uppercase',
+                          letterSpacing: '1px',
+                          fontWeight: 'bold',
+                        }}>
+                          Today
+                        </span>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+
+              {/* Habit count and unlock progress */}
+              <div style={{
+                display: 'flex',
+                flexDirection: 'column',
+                alignItems: 'center',
+                gap: '4px',
+              }}>
+                <span style={{
+                  fontSize: '14px',
+                  color: completionPercent === 100 ? '#00ff41' : '#fff',
+                  fontWeight: completionPercent === 100 ? 'bold' : 'normal',
+                }}>
+                  {completedCount}/{habitsForSelectedDate.length} {completionPercent === 100 ? '✓' : `(${completionPercent}%)`}
+                </span>
+                {getTotalHearts(completionPercent) >= 2.5 && (
+                  <span style={{
+                    fontSize: '10px',
+                    color: '#00ff41',
+                    animation: 'headerPulse 1.5s ease-in-out infinite',
+                  }}>
+                    ★ New friend soon!
+                  </span>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
 
       <div style={{ maxWidth: '700px', margin: '0 auto', position: 'relative', zIndex: 1 }}>
         {/* Navigation - Desktop only (mobile uses floating island) */}
@@ -1973,76 +2362,6 @@ const HabitTracker = () => {
             </button>
           </div>
         </div>
-        )}
-
-        {/* Hagotchi Companion - Only show on Today view */}
-        {selectedView === 'today' && spirit && currentSkin && (
-          <div style={{ marginBottom: '16px' }}>
-            <HagotchiCompanion
-              skin={currentSkin}
-              vitality={spirit.vitality}
-              isMobile={isMobile}
-              onTap={() => setShowSkinCollection(true)}
-              feeding={feedingAnimation}
-              vitalityGain={lastVitalityGain}
-            />
-            {/* Quick action buttons */}
-            <div style={{
-              display: 'flex',
-              justifyContent: 'center',
-              gap: '8px',
-              marginTop: '8px',
-            }}>
-              <button
-                onClick={() => setShowSkinCollection(true)}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #333',
-                  color: '#666',
-                  padding: '6px 12px',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  fontSize: '9px',
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.borderColor = '#00ff41';
-                  e.target.style.color = '#00ff41';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.borderColor = '#333';
-                  e.target.style.color = '#666';
-                }}
-              >
-                [skins {spirit.unlocked_skin_ids.length}/15]
-              </button>
-              <button
-                onClick={() => setShowLoreArchive(true)}
-                style={{
-                  background: 'transparent',
-                  border: '1px solid #333',
-                  color: '#666',
-                  padding: '6px 12px',
-                  cursor: 'pointer',
-                  fontFamily: 'inherit',
-                  fontSize: '9px',
-                  letterSpacing: '0.5px',
-                  textTransform: 'uppercase',
-                }}
-                onMouseEnter={(e) => {
-                  e.target.style.borderColor = '#00ff41';
-                  e.target.style.color = '#00ff41';
-                }}
-                onMouseLeave={(e) => {
-                  e.target.style.borderColor = '#333';
-                  e.target.style.color = '#666';
-                }}
-              >
-                [lore]
-              </button>
-            </div>
-          </div>
         )}
 
         {/* Habits List - Only show on Today view */}
@@ -2914,6 +3233,16 @@ const HabitTracker = () => {
         )}
 
       </div>
+        {/*
+          Scroll spacer for mobile:
+          - Scroll threshold to show compact header: 280px
+          - This spacer must be large enough that: content_height - viewport_height > 280px
+          - Using 50vh (half viewport) ensures enough scroll room on any screen size
+          - Min 300px ensures it works on very short content too
+        */}
+        {isMobile && selectedView === 'today' && (
+          <div style={{ height: 'max(300px, 50vh)', flexShrink: 0 }} aria-hidden="true" />
+        )}
       </div>
 
       {/* Floating Island - Mobile only */}
@@ -3734,9 +4063,11 @@ const HabitTracker = () => {
         <SkinCollection
           isOpen={showSkinCollection}
           onClose={() => setShowSkinCollection(false)}
-          unlockedSkinIds={spirit?.unlocked_skin_ids || ['pixel_spirit']}
-          activeSkinId={spirit?.active_skin_id || 'pixel_spirit'}
+          unlockedSkinIds={spirit?.unlocked_skin_ids || ['egbert']}
+          activeSkinId={spirit?.active_skin_id || 'egbert'}
           onSelectSkin={switchSkin}
+          onSetCustomName={setCustomName}
+          getStatsForSkin={getStatsForSkin}
           isMobile={isMobile}
         />
 
@@ -3744,7 +4075,7 @@ const HabitTracker = () => {
         <LoreArchive
           isOpen={showLoreArchive}
           onClose={() => setShowLoreArchive(false)}
-          unlockedSkinIds={spirit?.unlocked_skin_ids || ['pixel_spirit']}
+          unlockedSkinIds={spirit?.unlocked_skin_ids || ['egbert']}
           isMobile={isMobile}
         />
 
@@ -3753,6 +4084,14 @@ const HabitTracker = () => {
           skinId={pendingUnlock}
           isOpen={showUnlockAnimation}
           onClose={closeUnlockAnimation}
+          isMobile={isMobile}
+        />
+
+        {/* Hagotchi Onboarding - for new users */}
+        <Onboarding
+          isOpen={showOnboarding}
+          onComplete={completeOnboarding}
+          createSpirit={createSpirit}
           isMobile={isMobile}
         />
 

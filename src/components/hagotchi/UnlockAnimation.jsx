@@ -5,7 +5,7 @@ import { hapticSuccess, hapticHeavy } from '../../services/haptics';
 const UnlockAnimation = ({
   skinId,
   isOpen,
-  onClose,
+  onClose, // now accepts (setAsActive: boolean)
   isMobile
 }) => {
   const [phase, setPhase] = useState('spinning'); // spinning, revealing, revealed
@@ -68,6 +68,14 @@ const UnlockAnimation = ({
     ? SKINS[spinIndex]
     : unlockedSkin;
 
+  const handleSetAsActive = () => {
+    onClose(true); // Set as active
+  };
+
+  const handleKeepCurrent = () => {
+    onClose(false); // Don't change active
+  };
+
   return (
     <div
       style={{
@@ -95,7 +103,7 @@ const UnlockAnimation = ({
         textShadow: '0 0 10px rgba(0, 255, 65, 0.5)',
         animation: phase === 'revealed' ? 'pulse 1s ease-in-out infinite' : 'none',
       }}>
-        {phase === 'spinning' ? 'Unlocking...' : phase === 'revealing' ? 'New Companion!' : 'Companion Unlocked!'}
+        {phase === 'spinning' ? 'Unlocking...' : phase === 'revealing' ? 'New Hagotchi!' : 'Hagotchi Unlocked!'}
       </div>
 
       {/* Skin Display Container */}
@@ -198,27 +206,66 @@ const UnlockAnimation = ({
         </div>
       )}
 
-      {/* Continue Button (only shown when revealed) */}
+      {/* Action Buttons (only shown when revealed) */}
       {phase === 'revealed' && (
-        <button
-          onClick={onClose}
-          style={{
-            marginTop: '24px',
-            padding: '12px 32px',
-            backgroundColor: '#00ff41',
-            border: 'none',
-            color: '#000',
-            cursor: 'pointer',
-            fontFamily: 'inherit',
+        <div style={{
+          marginTop: '24px',
+          display: 'flex',
+          flexDirection: 'column',
+          gap: '12px',
+          width: '100%',
+          maxWidth: '280px',
+          animation: 'fadeIn 0.5s ease-out',
+        }}>
+          {/* Prompt */}
+          <div style={{
             fontSize: isMobile ? '12px' : '11px',
-            fontWeight: 'bold',
-            letterSpacing: '1px',
-            textTransform: 'uppercase',
-            animation: 'fadeIn 0.5s ease-out',
-          }}
-        >
-          Continue
-        </button>
+            color: '#888',
+            textAlign: 'center',
+            marginBottom: '4px',
+          }}>
+            Set {unlockedSkin.name} as active?
+          </div>
+
+          {/* Set as Active Button */}
+          <button
+            onClick={handleSetAsActive}
+            style={{
+              padding: '12px 32px',
+              backgroundColor: '#00ff41',
+              border: 'none',
+              color: '#000',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: isMobile ? '12px' : '11px',
+              fontWeight: 'bold',
+              letterSpacing: '1px',
+              textTransform: 'uppercase',
+              transition: 'opacity 0.2s',
+            }}
+          >
+            Yes, Activate
+          </button>
+
+          {/* Keep Current Button */}
+          <button
+            onClick={handleKeepCurrent}
+            style={{
+              padding: '12px 32px',
+              backgroundColor: 'transparent',
+              border: '1px solid #444',
+              color: '#888',
+              cursor: 'pointer',
+              fontFamily: 'inherit',
+              fontSize: isMobile ? '12px' : '11px',
+              letterSpacing: '1px',
+              textTransform: 'uppercase',
+              transition: 'border-color 0.2s, color 0.2s',
+            }}
+          >
+            Keep Current
+          </button>
+        </div>
       )}
 
       {/* CSS Keyframes */}

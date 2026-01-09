@@ -121,6 +121,77 @@ Streaks are calculated from the `completions` table, NOT the `habits.streak` fie
 - Set `autoFocus={!isMobile}` on form inputs in modals
 - Prevents keyboard from auto-opening on iOS when modals open
 
+## Hagotchi Companion System
+
+### Overview
+Virtual pet companion that responds to habit completions. Lives in the Today view above the habits list.
+
+### Data Storage
+- **hagotchi_spirit table**: Stores user's companion state
+  - `active_skin_id`: Current character (e.g., 'egbert')
+  - `vitality`: 0-100, decays 2 points/hour, gains 15-25 per habit completion
+  - `unlocked_skin_ids`: Array of unlocked character IDs
+  - `total_habits_completed`: Lifetime count for unlock milestones
+  - `longest_streak`: For streak-based unlocks
+- **localStorage cache**: `hagotchi_cache_v2` for faster loads
+
+### Characters (15 total)
+| Rarity | Characters | Unlock |
+|--------|------------|--------|
+| Common | Egbert (default), Pum, Bell | Start, 3-day streak, 10 habits |
+| Uncommon | Buns, Doog, Dock, Gose | 7-day streak, 25 habits, 14-day streak, 50 habits |
+| Rare | Axol, Snee, Turmy, Boom | 21-day streak, 75 habits, 30-day streak, 100 habits |
+| Epic | Brr, Rac, OOO | 45-day streak, 150 habits, 60-day streak |
+| Legendary | Rad | 200 habits |
+
+### File Structure
+- `src/components/hagotchi/HagotchiCompanion.jsx` - Main display component
+- `src/components/hagotchi/SkinCollection.jsx` - Character selection modal
+- `src/components/hagotchi/LoreArchive.jsx` - Character backstories modal
+- `src/components/hagotchi/UnlockAnimation.jsx` - New character unlock animation
+- `src/data/hagotchiSkins.js` - Character definitions, rarities, unlock conditions
+- `src/hooks/useHagotchi.js` - State management, Supabase sync
+- `public/hagotchi/*.svg` - Character sprite SVGs (pixel art in terminal green)
+
+### Vitality States
+- **Thriving** (80-100): Full opacity, green glow, bouncing animation
+- **Content** (40-79): Slight opacity reduction, bouncing
+- **Tired** (20-39): Reduced opacity, orange color, no bounce
+- **Dormant** (0-19): Very faded, grayscale, "zzz" indicator
+
+### Important Gotchas
+1. **Skin ID Migration**: Old ASCII art skin IDs (pixel_spirit, ember_wisp, etc.) auto-migrate to new IDs (egbert, pum, etc.) on fetch
+2. **Fallback Skin**: `getSkinById()` returns SKINS[0] (Egbert) if ID not found
+3. **Cache Invalidation**: Bump `hagotchi_cache_v2` version to force refresh
+4. **Display Condition**: Only shows when `selectedView === 'today' && spirit && currentSkin`
+5. **New User Creation**: Spirit auto-creates on first fetch if none exists (PGRST116 error handling)
+
+### Expandable Header (Mobile)
+The Hagotchi header has two states:
+- **Expanded**: Large hero with character, hearts, encouragement bubble - shown at top of page
+- **Collapsed**: Compact header with small character + hearts - slides in when scrolled
+
+**Scroll behavior:**
+- Expanded hero is in the scrollable content area (not fixed)
+- Fixed compact header is hidden (`translateY(-100%)`) when at top
+- After scrolling 280px, compact header slides in (`translateY(0)`)
+- Scrolling back to <50px hides compact header again
+
+**Critical: Scroll Spacer**
+A spacer at the bottom of content ensures enough scroll room to trigger the compact header:
+```jsx
+<div style={{ height: 'max(300px, 50vh)' }} />
+```
+- **Must use viewport-relative units** (vh), not fixed px
+- Fixed px spacers break on different screen sizes - content fits without scrolling 280px
+- `max(300px, 50vh)` guarantees enough scroll room on any screen
+- This has been a recurring bug - DO NOT change to fixed px values
+
+### Supabase Migration
+The `hagotchi_spirit` table must exist. Migration at `supabase/migrations/003_create_hagotchi_spirit_table.sql`.
+
+**Known Issue**: If a `handle_new_user` trigger exists that references a non-existent `profiles` table, user signup will fail with "Database error saving new user". Fix: `DROP FUNCTION IF EXISTS public.handle_new_user() CASCADE;`
+
 ## BottomSheet Component
 - Slides up from bottom on mobile, centered modal on desktop
 - Takes `isMobile` prop to determine behavior
