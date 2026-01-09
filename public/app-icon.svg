@@ -3,8 +3,8 @@
 
   <defs>
     <filter id="glow" x="-50%" y="-50%" width="200%" height="200%">
-      <feGaussianBlur stdDeviation="12" result="blur1"/>
-      <feGaussianBlur stdDeviation="25" result="blur2"/>
+      <feGaussianBlur stdDeviation="8" result="blur1"/>
+      <feGaussianBlur stdDeviation="20" result="blur2"/>
       <feMerge>
         <feMergeNode in="blur2"/>
         <feMergeNode in="blur1"/>
@@ -13,27 +13,124 @@
     </filter>
   </defs>
 
-  <!-- Pixel art H made of square dots - 30% smaller with glow -->
+  <!-- Pixel art Hagotchi creature - cute blob pet -->
   <g fill="#00ff41" filter="url(#glow)">
-    <!-- Left column -->
-    <rect x="310" y="262" width="71" height="71" rx="7"/>
-    <rect x="310" y="348" width="71" height="71" rx="7"/>
-    <rect x="310" y="434" width="71" height="71" rx="7"/>
-    <rect x="310" y="520" width="71" height="71" rx="7"/>
-    <rect x="310" y="606" width="71" height="71" rx="7"/>
-    <rect x="310" y="692" width="71" height="71" rx="7"/>
+    <!-- Antenna/ears -->
+    <rect x="340" y="180" width="48" height="48" rx="4"/>
+    <rect x="636" y="180" width="48" height="48" rx="4"/>
 
-    <!-- Right column -->
-    <rect x="643" y="262" width="71" height="71" rx="7"/>
-    <rect x="643" y="348" width="71" height="71" rx="7"/>
-    <rect x="643" y="434" width="71" height="71" rx="7"/>
-    <rect x="643" y="520" width="71" height="71" rx="7"/>
-    <rect x="643" y="606" width="71" height="71" rx="7"/>
-    <rect x="643" y="692" width="71" height="71" rx="7"/>
+    <!-- Head top row -->
+    <rect x="388" y="228" width="48" height="48" rx="4"/>
+    <rect x="440" y="228" width="48" height="48" rx="4"/>
+    <rect x="492" y="228" width="48" height="48" rx="4"/>
+    <rect x="544" y="228" width="48" height="48" rx="4"/>
+    <rect x="596" y="228" width="48" height="48" rx="4"/>
 
-    <!-- Middle bar -->
-    <rect x="396" y="477" width="71" height="71" rx="7"/>
-    <rect x="476" y="477" width="71" height="71" rx="7"/>
-    <rect x="557" y="477" width="71" height="71" rx="7"/>
+    <!-- Head second row (wider) -->
+    <rect x="340" y="276" width="48" height="48" rx="4"/>
+    <rect x="388" y="276" width="48" height="48" rx="4"/>
+    <rect x="440" y="276" width="48" height="48" rx="4"/>
+    <rect x="492" y="276" width="48" height="48" rx="4"/>
+    <rect x="544" y="276" width="48" height="48" rx="4"/>
+    <rect x="596" y="276" width="48" height="48" rx="4"/>
+    <rect x="644" y="276" width="48" height="48" rx="4"/>
+
+    <!-- Body rows -->
+    <rect x="292" y="324" width="48" height="48" rx="4"/>
+    <rect x="340" y="324" width="48" height="48" rx="4"/>
+    <rect x="388" y="324" width="48" height="48" rx="4"/>
+    <rect x="440" y="324" width="48" height="48" rx="4"/>
+    <rect x="492" y="324" width="48" height="48" rx="4"/>
+    <rect x="544" y="324" width="48" height="48" rx="4"/>
+    <rect x="596" y="324" width="48" height="48" rx="4"/>
+    <rect x="644" y="324" width="48" height="48" rx="4"/>
+    <rect x="692" y="324" width="48" height="48" rx="4"/>
+
+    <!-- Eye row - leave gaps for eyes -->
+    <rect x="292" y="372" width="48" height="48" rx="4"/>
+    <rect x="340" y="372" width="48" height="48" rx="4"/>
+    <!-- left eye gap -->
+    <rect x="492" y="372" width="48" height="48" rx="4"/>
+    <!-- right eye gap -->
+    <rect x="644" y="372" width="48" height="48" rx="4"/>
+    <rect x="692" y="372" width="48" height="48" rx="4"/>
+
+    <!-- Below eyes -->
+    <rect x="292" y="420" width="48" height="48" rx="4"/>
+    <rect x="340" y="420" width="48" height="48" rx="4"/>
+    <rect x="388" y="420" width="48" height="48" rx="4"/>
+    <rect x="440" y="420" width="48" height="48" rx="4"/>
+    <rect x="492" y="420" width="48" height="48" rx="4"/>
+    <rect x="544" y="420" width="48" height="48" rx="4"/>
+    <rect x="596" y="420" width="48" height="48" rx="4"/>
+    <rect x="644" y="420" width="48" height="48" rx="4"/>
+    <rect x="692" y="420" width="48" height="48" rx="4"/>
+
+    <!-- Mouth row - small smile -->
+    <rect x="292" y="468" width="48" height="48" rx="4"/>
+    <rect x="340" y="468" width="48" height="48" rx="4"/>
+    <rect x="388" y="468" width="48" height="48" rx="4"/>
+    <!-- mouth gap -->
+    <rect x="544" y="468" width="48" height="48" rx="4"/>
+    <rect x="596" y="468" width="48" height="48" rx="4"/>
+    <rect x="644" y="468" width="48" height="48" rx="4"/>
+    <rect x="692" y="468" width="48" height="48" rx="4"/>
+
+    <!-- Below mouth -->
+    <rect x="292" y="516" width="48" height="48" rx="4"/>
+    <rect x="340" y="516" width="48" height="48" rx="4"/>
+    <rect x="388" y="516" width="48" height="48" rx="4"/>
+    <rect x="440" y="516" width="48" height="48" rx="4"/>
+    <rect x="492" y="516" width="48" height="48" rx="4"/>
+    <rect x="544" y="516" width="48" height="48" rx="4"/>
+    <rect x="596" y="516" width="48" height="48" rx="4"/>
+    <rect x="644" y="516" width="48" height="48" rx="4"/>
+    <rect x="692" y="516" width="48" height="48" rx="4"/>
+
+    <!-- Body continues -->
+    <rect x="292" y="564" width="48" height="48" rx="4"/>
+    <rect x="340" y="564" width="48" height="48" rx="4"/>
+    <rect x="388" y="564" width="48" height="48" rx="4"/>
+    <rect x="440" y="564" width="48" height="48" rx="4"/>
+    <rect x="492" y="564" width="48" height="48" rx="4"/>
+    <rect x="544" y="564" width="48" height="48" rx="4"/>
+    <rect x="596" y="564" width="48" height="48" rx="4"/>
+    <rect x="644" y="564" width="48" height="48" rx="4"/>
+    <rect x="692" y="564" width="48" height="48" rx="4"/>
+
+    <!-- Narrowing body -->
+    <rect x="340" y="612" width="48" height="48" rx="4"/>
+    <rect x="388" y="612" width="48" height="48" rx="4"/>
+    <rect x="440" y="612" width="48" height="48" rx="4"/>
+    <rect x="492" y="612" width="48" height="48" rx="4"/>
+    <rect x="544" y="612" width="48" height="48" rx="4"/>
+    <rect x="596" y="612" width="48" height="48" rx="4"/>
+    <rect x="644" y="612" width="48" height="48" rx="4"/>
+
+    <!-- Feet row -->
+    <rect x="340" y="660" width="48" height="48" rx="4"/>
+    <rect x="388" y="660" width="48" height="48" rx="4"/>
+    <rect x="596" y="660" width="48" height="48" rx="4"/>
+    <rect x="644" y="660" width="48" height="48" rx="4"/>
+
+    <!-- Bottom feet -->
+    <rect x="292" y="708" width="48" height="48" rx="4"/>
+    <rect x="340" y="708" width="48" height="48" rx="4"/>
+    <rect x="644" y="708" width="48" height="48" rx="4"/>
+    <rect x="692" y="708" width="48" height="48" rx="4"/>
+  </g>
+
+  <!-- Eyes (black/dark pixels for contrast) -->
+  <g fill="#0a0a0a">
+    <rect x="388" y="372" width="48" height="48" rx="4"/>
+    <rect x="440" y="372" width="48" height="48" rx="4"/>
+    <rect x="544" y="372" width="48" height="48" rx="4"/>
+    <rect x="596" y="372" width="48" height="48" rx="4"/>
+  </g>
+
+  <!-- Mouth (black pixels) -->
+  <g fill="#0a0a0a">
+    <rect x="440" y="468" width="48" height="48" rx="4"/>
+    <rect x="492" y="468" width="48" height="48" rx="4"/>
   </g>
 </svg>
