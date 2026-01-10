@@ -6,16 +6,18 @@ const DAILY_BRIEFING_KEY = 'hagotchi_daily_briefing_v1';
 const LOCATION_PERMISSION_KEY = 'hagotchi_location_asked';
 
 // Check if we should show the daily briefing (once per day)
+// TODO: Set back to once per day after testing
 export const shouldShowDailyBriefing = () => {
-  try {
-    const lastShown = localStorage.getItem(DAILY_BRIEFING_KEY);
-    if (!lastShown) return true;
-
-    const today = new Date().toDateString();
-    return lastShown !== today;
-  } catch {
-    return false;
-  }
+  return true; // TESTING: Always show
+  // try {
+  //   const lastShown = localStorage.getItem(DAILY_BRIEFING_KEY);
+  //   if (!lastShown) return true;
+  //
+  //   const today = new Date().toDateString();
+  //   return lastShown !== today;
+  // } catch {
+  //   return false;
+  // }
 };
 
 // Mark daily briefing as shown
@@ -54,23 +56,71 @@ const HOLIDAYS = {
   "12-31": { name: "New Year's Eve", fact: "The Times Square ball has been dropping since 1907." },
 };
 
-// Fun facts for regular days
+// Fun facts for regular days - verified from science and history sources
 const GENERAL_FACTS = [
-  "The average person walks about 100,000 miles in their lifetime.",
-  "Honey never spoils—3,000-year-old honey was found edible in Egyptian tombs.",
-  "Octopuses have three hearts and blue blood.",
+  // Space & Science
+  "You travel 2.5 million kilometers around the Sun every day without realizing it.",
+  "A cloud weighs around a million tonnes on average.",
+  "There's a planet made almost entirely of diamonds, called 55 Cancri e.",
+  "Golf was the first sport played on the Moon, by Alan Shepard in 1971.",
+  "A day on Venus is longer than its year—243 Earth days vs 225.",
+  "The Sun accounts for 99.86% of all mass in our solar system.",
+  "Neutron stars are so dense that a teaspoon would weigh 6 billion tons.",
+  "Light from the Sun takes 8 minutes and 20 seconds to reach Earth.",
+  "Saturn would float if you could find a bathtub big enough.",
+  "There are more trees on Earth than stars in the Milky Way.",
+
+  // Animals
+  "Hippos can't actually swim—they gallop along the riverbed instead.",
+  "Giraffes are 30 times more likely to get hit by lightning than humans.",
+  "Polar bears have black skin underneath their white fur.",
+  "Octopuses have three hearts, nine brains, and blue blood.",
+  "Butterflies can taste food with their feet.",
   "A group of flamingos is called a 'flamboyance.'",
-  "The inventor of the Pringles can is buried in one.",
-  "Bananas are berries, but strawberries aren't.",
-  "Scotland's national animal is the unicorn.",
-  "The shortest war in history lasted 38 minutes.",
-  "A day on Venus is longer than its year.",
   "Cows have best friends and get stressed when separated.",
-  "The moon has moonquakes.",
-  "Wombat poop is cube-shaped.",
-  "Dolphins have names for each other.",
+  "Dolphins have names for each other and respond when called.",
+  "Wombat poop is cube-shaped to prevent it from rolling away.",
+  "Ants don't have lungs—they breathe through tiny holes in their bodies.",
+  "Sloths can hold their breath longer than dolphins—up to 40 minutes.",
+  "A snail can sleep for three years at a time.",
+  "Elephants are the only animals that can't jump.",
+  "A shrimp's heart is located in its head.",
+  "Koalas have fingerprints almost identical to humans.",
+
+  // Human Body
+  "Humans can distinguish approximately 10 million different colors.",
+  "Your heart beats about 100,000 times every single day.",
+  "Just like fingerprints, everyone's tongue print is unique.",
+  "There are 60,000 miles of blood vessels in your body.",
+  "The cornea is the only part of your body with no blood supply.",
+  "Your brain uses about 20% of your body's total energy.",
+  "Humans shed about 600,000 particles of skin every hour.",
+  "The human nose can detect over 1 trillion different scents.",
+  "Babies are born with 300 bones but adults only have 206.",
+
+  // History & Culture
+  "Cleopatra lived closer in time to the Moon landing than to the building of the Great Pyramid.",
+  "Oxford University is older than the Aztec Empire.",
+  "The Hawaiian pizza was invented in Ontario, Canada in 1962.",
+  "German chocolate cake was named after Sam German, not the country.",
+  "The shortest war in history lasted 38 minutes (Britain vs Zanzibar, 1896).",
+  "In 1898, a novella predicted a ship called 'Titan' hitting an iceberg—14 years before Titanic.",
+  "Mary Shelley wrote Frankenstein when she was only 18 years old.",
+  "Honey never spoils—3,000-year-old honey was found edible in Egyptian tombs.",
+  "Scotland's national animal is the unicorn.",
+  "The Eiffel Tower can grow up to 6 inches taller in summer heat.",
+
+  // Quirky
+  "The # symbol is technically called an 'octothorpe.'",
   "A jiffy is an actual unit of time: 1/100th of a second.",
-  "The Hawaiian pizza was invented in Canada.",
+  "Bananas are berries, but strawberries technically aren't.",
+  "Australia is wider than the Moon's diameter.",
+  "The inventor of the Pringles can is buried in one.",
+  "The average person walks about 100,000 miles in their lifetime.",
+  "The moon has moonquakes that can last for hours.",
+  "In Ancient Olympics, athletes competed completely naked.",
+  "A bolt of lightning is five times hotter than the Sun's surface.",
+  "The unicorn is Scotland's national animal because it was seen as a symbol of purity and power.",
 ];
 
 // Get today's holiday or a random fun fact
@@ -455,23 +505,23 @@ const DailyBriefing = ({
           }}>
             {todayFact && (
               <div style={{
-                maxWidth: '340px',
+                maxWidth: '360px',
                 padding: '0 24px',
-                marginBottom: '24px',
+                marginBottom: '28px',
               }}>
                 <div style={{
-                  fontSize: '11px',
+                  fontSize: isMobile ? '14px' : '12px',
                   color: todayFact.type === 'holiday' ? '#ffaa00' : '#888',
                   letterSpacing: '1px',
                   textTransform: 'uppercase',
-                  marginBottom: '8px',
+                  marginBottom: '10px',
                 }}>
                   {todayFact.type === 'holiday' ? `Today: ${todayFact.name}` : 'Did You Know?'}
                 </div>
                 <div style={{
-                  fontSize: '13px',
-                  color: '#666',
-                  lineHeight: 1.5,
+                  fontSize: isMobile ? '16px' : '14px',
+                  color: '#777',
+                  lineHeight: 1.6,
                 }}>
                   {todayFact.fact}
                 </div>

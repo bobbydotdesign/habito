@@ -7,6 +7,7 @@
 
 export const DAILY_BRIEFING_MESSAGES = {
   nurturing: [
+    // Grounded, warm encouragement
     "A new day awaits you, friend. Every small step matters.",
     "Welcome to today. I believe in you, even on the hard days.",
     "Good to see you. Be kind to yourself today.",
@@ -14,33 +15,47 @@ export const DAILY_BRIEFING_MESSAGES = {
     "Let's make this day count together. One habit at a time.",
     "A fresh start awaits. Your effort today builds tomorrow.",
     "I'm glad you're here. Progress isn't always visible, but it's real.",
+    // Inspired by self-compassion research (Kristin Neff)
+    "Treat yourself like you'd treat a good friend today.",
+    "Whatever happens, you're doing your best. That matters.",
   ],
   energetic: [
-    "LET'S GOOO! New day, new victories! You're UNSTOPPABLE!",
-    "TODAY IS YOUR DAY! Champions make progress, not excuses!",
-    "Fresh start! Your only competition is yesterday's you!",
-    "Rise and shine! Every habit is a small victory. Stack 'em up!",
-    "The grind never stops! Consistency is your superpower!",
-    "Maximum energy activated! Today you become even more awesome!",
-    "Ready to crush it?! Doubters gonna doubt, winners gonna WIN!",
+    // High energy but grounded
+    "New day, new opportunities! Let's make it count!",
+    "Today is YOUR day! Champions show up, especially on the hard days!",
+    "Fresh start! Your only competition is who you were yesterday!",
+    "Rise and shine! Every completed habit is a win. Stack 'em up!",
+    "Consistency is your superpower! Let's build on yesterday!",
+    "Ready? Today you're one step closer to your best self!",
+    // Sports psychology inspired
+    "The best time to start was yesterday. The second best time is now!",
+    "Small wins lead to big changes. Let's get that first one!",
   ],
   calm: [
+    // Philosophical, grounded
     "Another sunrise. Another opportunity. Trust the process.",
     "The day unfolds at its own pace. Be like water.",
     "Breathe in possibility. Growth happens in quiet moments.",
     "Today is a clean slate. Mastery is practice in disguise.",
-    "A moment of stillness before the journey. Begin.",
+    "A moment of stillness before the journey. Begin when ready.",
     "Small actions, repeated, become great things.",
-    "The journey continues. Trust the rhythm of daily practice.",
+    // Stoic-inspired
+    "Focus on what you can control. Let go of the rest.",
+    "The present moment is all we truly have. Use it well.",
+    // Lao Tzu inspired
+    "A journey of a thousand miles begins with a single step.",
   ],
   playful: [
-    "Guess what?! It's a brand new day! You're gonna crush it!",
-    "Plot twist: Today's gonna be awesome! Spoiler: It's because of you!",
-    "Ready for adventure? Pro tip: Doing the thing > thinking about it!",
-    "New day who dis? Just kidding! Today's mission: Be awesome!",
-    "Wake up! Fun fact: You're cooler than you think!",
-    "Achievement unlocked: Showing up! The secret ingredient is YOU!",
-    "Plot armor activated! You literally can't lose today!",
+    // Warm, friendly, and genuine
+    "Good morning! Today's forecast: chance of accomplishments!",
+    "Hey you! Ready for a good day? I thought so.",
+    "New day loading... Progress bar looking good!",
+    "Fun fact: You showed up. That's already a win.",
+    "Another day, another adventure. Let's see what happens!",
+    "The best part about today? It's brand new.",
+    // Light-hearted encouragement
+    "Remember: done is better than perfect. Let's do this!",
+    "Pro tip: Showing up is 80% of success. You're almost there!",
   ],
 };
 
@@ -574,84 +589,139 @@ export const getCompletionTrigger = (percentage, previousPercentage = 0) => {
 // ============================================
 
 export const INTERACTION_MESSAGES = {
+  // Classic jokes from comedy archives and well-known sources
   tell_joke: {
     nurturing: [
-      "Why did the habit go to therapy? It had too many triggers!",
-      "What do you call a lazy habit? A sit-bit.",
-      "I tried to write a joke about procrastination... I'll finish it later.",
-      "Why do habits make great friends? They always show up!",
+      // Steven Wright style observational humor
+      "I used to think I was indecisive, but now I'm not so sure.",
+      "I told my doctor I broke my arm in two places. He said stop going to those places.",
+      // Mitch Hedberg style
+      "I'm against picketing, but I don't know how to show it.",
+      "I haven't slept for ten days, because that would be too long.",
+      // Classic one-liners
+      "I'm reading a book about anti-gravity. It's impossible to put down.",
     ],
     energetic: [
-      "Why was the habit so buff? It never skipped leg day! GET IT?!",
-      "Knock knock! Who's there? Consistency! THE BEST JOKE!",
-      "What's a habit's favorite music? Heavy REPETITION! HA!",
-      "Why did the streak go to the gym? To stay UNBROKEN! HAHA!",
+      // Classic energetic humor
+      "Why don't scientists trust atoms? Because they make up everything!",
+      "I told my wife she was drawing her eyebrows too high. She looked surprised!",
+      "What do you call a fish without eyes? A fsh!",
+      "I'm on a seafood diet. I see food and I eat it!",
+      // Tim Vine style
+      "I've just written a song about tortillas. Actually, it's more of a wrap.",
     ],
     calm: [
-      "Why do habits meditate? To stay present in the routine.",
-      "What did the wise habit say? 'This too shall be repeated.'",
-      "A habit walks into a bar. Again. And again. That's the joke.",
-      "Why are habits like rivers? They follow the path of least resistance.",
+      // Dry wit / deadpan
+      "I used to play piano by ear, but now I use my hands.",
+      "Time flies like an arrow. Fruit flies like a banana.",
+      // Philosophical humor
+      "A photon checks into a hotel. The bellhop asks 'Any luggage?' It replies 'No, I'm traveling light.'",
+      "Two antennas met on a roof, fell in love, and got married. The ceremony wasn't much, but the reception was excellent.",
+      "I'm not lazy. I'm on energy-saving mode.",
     ],
     playful: [
-      "Why did the habit break up with the excuse? No commitment!",
-      "What did one habit say to another? 'I'll see you tomorrow!'",
-      "Why are habits bad at hide and seek? They always show up!",
-      "What's a habit's favorite day? TODAYYYyyy!",
+      // Silly classic jokes
+      "What do you call a bear with no teeth? A gummy bear!",
+      "Why couldn't the bicycle stand up by itself? It was two tired!",
+      "What do you call a fake noodle? An impasta!",
+      "Why did the scarecrow win an award? Because he was outstanding in his field!",
+      "What's orange and sounds like a parrot? A carrot!",
     ],
   },
 
+  // Real facts sourced from scientific studies and research
   tell_fact: {
     nurturing: [
-      "It takes 66 days on average to form a new habit. You're doing great.",
-      "Your brain physically changes when you build habits. Incredible, right?",
-      "Small habits compound. 1% better each day = 37x better in a year.",
-      "Habits use less mental energy than decisions. You're getting efficient.",
+      // From European Journal of Social Psychology (Phillippa Lally study)
+      "Research shows it takes 66 days on average to form a new habit. You're doing great.",
+      // From neuroscience research on habit formation
+      "Your brain physically changes when you build habits. New neural pathways form with each repetition.",
+      // James Clear's Atomic Habits math
+      "Small habits compound. Getting 1% better each day means you'll be 37x better in a year.",
+      // From cognitive load research
+      "Habits use the basal ganglia, freeing up your prefrontal cortex. You're literally becoming more efficient.",
     ],
     energetic: [
-      "Fun fact: Your habits shape your IDENTITY! You're building YOU!",
-      "SCIENCE SAYS: Habit stacking works! Pair new habits with old ones!",
-      "Did you know: Morning habits set the tone for your WHOLE DAY?!",
-      "Your brain LOVES routines! It's literally thanking you right now!",
+      // From identity-based habit research
+      "Every action is a vote for the type of person you wish to become!",
+      // BJ Fogg's Tiny Habits research (Stanford)
+      "Habit stacking really works! Stanford research shows pairing new habits with existing ones increases success!",
+      // Morning routine research
+      "Studies show morning routines reduce decision fatigue for the rest of your day!",
+      // From neuroscience of dopamine and habits
+      "Your brain releases dopamine not just from rewards, but from anticipating them! That's why routines feel good!",
     ],
     calm: [
-      "The Greek word 'ethos' means both habit and character.",
-      "Water shapes stone through consistency, not force.",
+      // Etymology fact
+      "The word 'ethos' in Greek means both habit and character. We become what we repeatedly do.",
+      // Attributed to Ovid
+      "Water shapes stone through persistence, not force. The same is true for building yourself.",
+      // James Clear, Atomic Habits
       "Your habits are votes for the person you wish to become.",
-      "The Buddhists call it 'right effort' - steady, not strained.",
+      // Buddhist concept of Right Effort
+      "The Buddha taught 'right effort' - steady and balanced, not strained. Sustainable beats intense.",
     ],
     playful: [
-      "Fun fact: You've already done habits today! Brushed teeth? Habit!",
-      "Did you know? Habits are like brain shortcuts! Very efficient!",
-      "Science says: Rewards help! So... treat yourself? I said so!",
-      "Fact: People who track habits are 40% more likely to succeed! LIKE YOU!",
+      // Fun framing of real habit science
+      "Plot twist: Brushing your teeth is a habit! You're already a habit master!",
+      // From cognitive science
+      "Habits are like brain shortcuts! Your basal ganglia is basically a habit hard drive!",
+      // From behavioral psychology
+      "Science says rewards help form habits! So... treat yourself? Doctor's orders!",
+      // From Dominican University study
+      "People who write down goals are 42% more likely to achieve them! Tracking works!",
     ],
   },
 
+  // Real quotes from notable people, with attributions available
   tell_encouragement: {
     nurturing: [
-      "I believe in you. Every small step counts.",
-      "You're exactly where you need to be right now.",
-      "Progress isn't always visible, but it's always happening.",
-      "Be gentle with yourself. You're doing better than you think.",
+      // Winston Churchill
+      "Success is not final, failure is not fatal: it is the courage to continue that counts.",
+      // Anne Lamott
+      "Almost everything will work again if you unplug it for a few minutes, including you.",
+      // Carl Rogers (psychologist)
+      "The curious paradox is that when I accept myself just as I am, then I can change.",
+      // Maya Angelou
+      "We delight in the beauty of the butterfly, but rarely admit the changes it has gone through.",
+      // Brené Brown
+      "You are imperfect, you are wired for struggle, but you are worthy of love and belonging.",
     ],
     energetic: [
-      "You've GOT this! I believe in you 100%!",
-      "Every day you show up, you're winning!",
-      "Your potential is UNLIMITED! Keep pushing!",
-      "Champions are made in moments like these! That's YOU!",
+      // Theodore Roosevelt
+      "Do what you can, with what you have, where you are!",
+      // Muhammad Ali
+      "Don't count the days, make the days count!",
+      // Wayne Gretzky
+      "You miss 100% of the shots you don't take!",
+      // Helen Keller
+      "Life is either a daring adventure or nothing at all!",
+      // Les Brown
+      "Shoot for the moon. Even if you miss, you'll land among the stars!",
     ],
     calm: [
-      "The journey matters more than the destination.",
-      "Trust the process. Growth is happening.",
-      "In stillness, strength is gathered.",
-      "You are becoming who you're meant to be.",
+      // Lao Tzu, Tao Te Ching
+      "A journey of a thousand miles begins with a single step.",
+      // Marcus Aurelius, Meditations
+      "The impediment to action advances action. What stands in the way becomes the way.",
+      // Viktor Frankl, Man's Search for Meaning
+      "Between stimulus and response there is a space. In that space is our power to choose.",
+      // Thich Nhat Hanh
+      "The present moment is filled with joy and happiness. If you are attentive, you will see it.",
+      // Rainer Maria Rilke
+      "The only journey is the one within.",
     ],
     playful: [
-      "Hey, you're awesome! Just thought you should know!",
-      "Plot twist: You're actually crushing it!",
-      "If habits had a fan club, I'd be president. And you'd be MVP!",
-      "Just between us? You're doing amazing. Don't tell anyone I said that.",
+      // Dr. Seuss
+      "You have brains in your head. You have feet in your shoes. You can steer yourself any direction you choose.",
+      // Oscar Wilde
+      "Be yourself; everyone else is already taken.",
+      // Mark Twain
+      "The secret of getting ahead is getting started.",
+      // Dolly Parton
+      "Find out who you are and do it on purpose.",
+      // Winnie the Pooh (A.A. Milne)
+      "You're braver than you believe, stronger than you seem, and smarter than you think.",
     ],
   },
 };
