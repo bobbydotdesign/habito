@@ -526,6 +526,100 @@ export const getCompletionTrigger = (percentage, previousPercentage = 0) => {
   return null;
 };
 
+// ============================================
+// ON-DEMAND INTERACTIONS (for tap menu)
+// ============================================
+
+export const INTERACTION_MESSAGES = {
+  tell_joke: {
+    nurturing: [
+      "Why did the habit go to therapy? It had too many triggers!",
+      "What do you call a lazy habit? A sit-bit.",
+      "I tried to write a joke about procrastination... I'll finish it later.",
+      "Why do habits make great friends? They always show up!",
+    ],
+    energetic: [
+      "Why was the habit so buff? It never skipped leg day! GET IT?!",
+      "Knock knock! Who's there? Consistency! THE BEST JOKE!",
+      "What's a habit's favorite music? Heavy REPETITION! HA!",
+      "Why did the streak go to the gym? To stay UNBROKEN! HAHA!",
+    ],
+    calm: [
+      "Why do habits meditate? To stay present in the routine.",
+      "What did the wise habit say? 'This too shall be repeated.'",
+      "A habit walks into a bar. Again. And again. That's the joke.",
+      "Why are habits like rivers? They follow the path of least resistance.",
+    ],
+    playful: [
+      "Why did the habit break up with the excuse? No commitment!",
+      "What did one habit say to another? 'I'll see you tomorrow!'",
+      "Why are habits bad at hide and seek? They always show up!",
+      "What's a habit's favorite day? TODAYYYyyy!",
+    ],
+  },
+
+  tell_fact: {
+    nurturing: [
+      "It takes 66 days on average to form a new habit. You're doing great.",
+      "Your brain physically changes when you build habits. Incredible, right?",
+      "Small habits compound. 1% better each day = 37x better in a year.",
+      "Habits use less mental energy than decisions. You're getting efficient.",
+    ],
+    energetic: [
+      "Fun fact: Your habits shape your IDENTITY! You're building YOU!",
+      "SCIENCE SAYS: Habit stacking works! Pair new habits with old ones!",
+      "Did you know: Morning habits set the tone for your WHOLE DAY?!",
+      "Your brain LOVES routines! It's literally thanking you right now!",
+    ],
+    calm: [
+      "The Greek word 'ethos' means both habit and character.",
+      "Water shapes stone through consistency, not force.",
+      "Your habits are votes for the person you wish to become.",
+      "The Buddhists call it 'right effort' - steady, not strained.",
+    ],
+    playful: [
+      "Fun fact: You've already done habits today! Brushed teeth? Habit!",
+      "Did you know? Habits are like brain shortcuts! Very efficient!",
+      "Science says: Rewards help! So... treat yourself? I said so!",
+      "Fact: People who track habits are 40% more likely to succeed! LIKE YOU!",
+    ],
+  },
+
+  tell_encouragement: {
+    nurturing: [
+      "I believe in you. Every small step counts.",
+      "You're exactly where you need to be right now.",
+      "Progress isn't always visible, but it's always happening.",
+      "Be gentle with yourself. You're doing better than you think.",
+    ],
+    energetic: [
+      "You've GOT this! I believe in you 100%!",
+      "Every day you show up, you're winning!",
+      "Your potential is UNLIMITED! Keep pushing!",
+      "Champions are made in moments like these! That's YOU!",
+    ],
+    calm: [
+      "The journey matters more than the destination.",
+      "Trust the process. Growth is happening.",
+      "In stillness, strength is gathered.",
+      "You are becoming who you're meant to be.",
+    ],
+    playful: [
+      "Hey, you're awesome! Just thought you should know!",
+      "Plot twist: You're actually crushing it!",
+      "If habits had a fan club, I'd be president. And you'd be MVP!",
+      "Just between us? You're doing amazing. Don't tell anyone I said that.",
+    ],
+  },
+};
+
+// Get a random interaction message
+export const getInteractionMessage = (type, personality) => {
+  const messages = INTERACTION_MESSAGES[type]?.[personality];
+  if (!messages?.length) return null;
+  return messages[Math.floor(Math.random() * messages.length)];
+};
+
 // Get heart milestone trigger
 export const getHeartTrigger = (newHearts, previousHearts) => {
   // Crossed integer threshold (earned a full heart)

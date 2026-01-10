@@ -139,6 +139,7 @@ const HabitTracker = () => {
   // Hagotchi companion state
   const [showSkinCollection, setShowSkinCollection] = useState(false);
   const [showLoreArchive, setShowLoreArchive] = useState(false);
+  const [showHagotchiMenu, setShowHagotchiMenu] = useState(false);
   const [headerCollapsed, setHeaderCollapsed] = useState(false);
   const contentRef = useRef(null);
 
@@ -565,6 +566,7 @@ const HabitTracker = () => {
     closeUnlockAnimation,
     encouragementMessage,
     clearEncouragement,
+    triggerInteraction,
   } = useHagotchi(user?.id);
 
   // Date navigation helpers - use local date to avoid timezone issues
@@ -1734,158 +1736,141 @@ const HabitTracker = () => {
 
         {selectedView === 'today' && spirit && currentSkin ? (
           <>
-            {/* COMPACT HEADER - Always rendered in fixed header (hidden when hero visible on mobile) */}
+            {/* COMPACT HEADER - Matches expanded hero top bar layout */}
             {(
               <div style={{ maxWidth: '700px', margin: '0 auto', padding: isMobile ? '10px 16px' : '16px 0' }}>
                 <div
-                  onClick={() => setShowSkinCollection(true)}
                   style={{
                     display: 'flex',
+                    justifyContent: 'space-between',
                     alignItems: 'center',
-                    gap: isMobile ? '12px' : '20px',
-                    cursor: 'pointer',
                     position: 'relative',
                   }}
                 >
-                  {/* Character */}
-                  <div style={{ position: 'relative', flexShrink: 0 }}>
-                    <div style={{
-                      position: 'absolute',
-                      top: '50%',
-                      left: '50%',
-                      transform: 'translate(-50%, -50%)',
-                      width: isMobile ? '52px' : '56px',
-                      height: isMobile ? '52px' : '56px',
-                      borderRadius: '50%',
-                      background: getTotalHearts(completionPercent) >= 2.5
-                        ? 'radial-gradient(circle, rgba(0,255,65,0.2) 0%, transparent 70%)'
-                        : 'radial-gradient(circle, rgba(0,255,65,0.08) 0%, transparent 70%)',
-                    }} />
+                  {/* Left: Coins */}
+                  <div style={{
+                    display: 'flex',
+                    alignItems: 'center',
+                    gap: '4px',
+                    padding: '4px 10px',
+                    backgroundColor: 'rgba(255, 170, 0, 0.08)',
+                    border: '1px solid rgba(255, 170, 0, 0.2)',
+                    borderRadius: '12px',
+                  }}>
+                    <span style={{ fontSize: '11px', color: '#ffaa00' }}>●</span>
+                    <span style={{
+                      fontSize: '12px',
+                      color: '#ffaa00',
+                      fontWeight: 'bold',
+                      fontFamily: 'monospace',
+                    }}>
+                      {spirit.coins || 0}
+                    </span>
+                  </div>
+
+                  {/* Center: Character + Hearts (clickable) */}
+                  <div
+                    onClick={() => setShowHagotchiMenu(true)}
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      cursor: 'pointer',
+                      padding: '4px 12px',
+                    }}
+                  >
                     <img
                       src={currentSkin.image}
                       alt={currentSkin.name}
                       style={{
-                        width: isMobile ? '40px' : '44px',
-                        height: isMobile ? '40px' : '44px',
+                        width: '28px',
+                        height: '28px',
                         imageRendering: 'pixelated',
-                        position: 'relative',
-                        zIndex: 1,
                         filter: 'drop-shadow(0 0 4px rgba(0,255,65,0.3))',
                       }}
                     />
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
+                      {[0, 1, 2].map(i => {
+                        const hearts = getTotalHearts(completionPercent);
+                        const fill = Math.max(0, Math.min(1, hearts - i));
+                        const isFull = fill >= 1;
+                        const isPartiallyFilled = fill > 0 && fill < 1;
+                        return (
+                          <svg
+                            key={i}
+                            viewBox="0 0 24 22"
+                            style={{
+                              width: '20px',
+                              height: '18px',
+                              filter: isFull
+                                ? 'drop-shadow(0 0 4px rgba(0, 255, 65, 0.6))'
+                                : isPartiallyFilled
+                                  ? 'drop-shadow(0 0 3px rgba(0, 255, 65, 0.4))'
+                                  : 'none',
+                              transition: 'filter 0.3s ease',
+                            }}
+                          >
+                            <path
+                              d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                              fill="none"
+                              stroke={fill <= 0 ? '#333' : '#00ff41'}
+                              strokeWidth="1.5"
+                            />
+                            <path
+                              d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                              fill="#00ff41"
+                              style={{ clipPath: `inset(${(1 - fill) * 100}% 0 0 0)` }}
+                            />
+                          </svg>
+                        );
+                      })}
+                    </div>
                   </div>
 
-                  {/* Stats */}
-                  <div style={{ flex: 1, minWidth: 0 }}>
-                    {/* Name + Hearts (first emphasized) + Count */}
+                  {/* Right: Menu */}
+                  {isMobile ? (
+                    <button
+                      onClick={(e) => { e.stopPropagation(); setShowMobileMenu(true); }}
+                      style={{
+                        background: 'transparent',
+                        border: '1px solid #333',
+                        color: '#666',
+                        padding: '6px 10px',
+                        cursor: 'pointer',
+                        fontFamily: 'inherit',
+                        fontSize: '14px',
+                        lineHeight: 1,
+                        borderRadius: '4px',
+                      }}
+                    >
+                      ⋮
+                    </button>
+                  ) : (
                     <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                      <span style={{ fontSize: isMobile ? '12px' : '11px', color: '#fff', fontWeight: '500' }}>
-                        {currentSkin.name}
-                      </span>
-                      <div style={{ display: 'flex', alignItems: 'center', gap: '4px' }}>
-                        {[0, 1, 2].map(i => {
-                          const hearts = getTotalHearts(completionPercent);
-                          const fill = Math.max(0, Math.min(1, hearts - i));
-                          const isToday = i === 0;
-                          const isPartiallyFilled = fill > 0 && fill < 1;
-                          return (
-                            <svg
-                              key={i}
-                              viewBox="0 0 24 22"
-                              style={{
-                                width: isToday ? '20px' : '12px',
-                                height: isToday ? '18px' : '11px',
-                                filter: isToday && isPartiallyFilled
-                                  ? 'drop-shadow(0 0 4px rgba(0, 255, 65, 0.5))'
-                                  : fill >= 1
-                                    ? 'drop-shadow(0 0 3px rgba(0, 255, 65, 0.6))'
-                                    : 'none',
-                              }}
-                            >
-                              <path
-                                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-                                fill="none"
-                                stroke={fill <= 0 ? '#333' : '#00ff41'}
-                                strokeWidth="1.5"
-                              />
-                              <path
-                                d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-                                fill="#00ff41"
-                                style={{ clipPath: `inset(${(1 - fill) * 100}% 0 0 0)` }}
-                              />
-                            </svg>
-                          );
-                        })}
-                      </div>
-                      <span style={{
-                        fontSize: '11px',
-                        color: completionPercent === 100 ? '#00ff41' : '#888',
-                        fontWeight: completionPercent === 100 ? 'bold' : 'normal',
-                      }}>
-                        {completedCount}/{habitsForSelectedDate.length}
-                      </span>
-                    </div>
-                  </div>
-
-                  {/* Coins + Menu */}
-                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                    <div style={{
-                      display: 'flex',
-                      alignItems: 'center',
-                      gap: '3px',
-                      padding: '3px 6px',
-                      backgroundColor: 'rgba(255, 170, 0, 0.08)',
-                      border: '1px solid rgba(255, 170, 0, 0.2)',
-                      borderRadius: '4px',
-                    }}>
-                      <span style={{ fontSize: '9px', color: '#ffaa00' }}>●</span>
-                      <span style={{ fontSize: '10px', color: '#ffaa00', fontWeight: 'bold', fontFamily: 'monospace' }}>
-                        {spirit.coins || 0}
-                      </span>
-                    </div>
-                    {isMobile && (
                       <button
-                        onClick={(e) => { e.stopPropagation(); setShowMobileMenu(true); }}
-                        style={{
-                          background: 'transparent',
-                          border: '1px solid #333',
-                          color: '#666',
-                          padding: '4px 8px',
-                          cursor: 'pointer',
-                          fontFamily: 'inherit',
-                          fontSize: '12px',
-                          lineHeight: 1,
-                        }}
+                        onClick={(e) => { e.stopPropagation(); setShowSettings(true); }}
+                        style={{ background: 'transparent', border: '1px solid #333', color: '#666', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px' }}
                       >
-                        ⋮
+                        [SETTINGS]
                       </button>
-                    )}
-                    {!isMobile && (
-                      <>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); setShowSettings(true); }}
-                          style={{ background: 'transparent', border: '1px solid #333', color: '#666', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px' }}
-                        >
-                          [SETTINGS]
-                        </button>
-                        <button
-                          onClick={(e) => { e.stopPropagation(); signOut(); }}
-                          style={{ background: 'transparent', border: '1px solid #333', color: '#666', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px' }}
-                        >
-                          [LOGOUT]
-                        </button>
-                      </>
-                    )}
-                  </div>
+                      <button
+                        onClick={(e) => { e.stopPropagation(); signOut(); }}
+                        style={{ background: 'transparent', border: '1px solid #333', color: '#666', padding: '4px 8px', cursor: 'pointer', fontFamily: 'inherit', fontSize: '9px' }}
+                      >
+                        [LOGOUT]
+                      </button>
+                    </div>
+                  )}
 
-                  {/* Encouragement bubble - compact */}
+                  {/* Encouragement bubble - compact, centered */}
                   {encouragementMessage && headerCollapsed && (
                     <div style={{
                       position: 'absolute',
                       top: '100%',
-                      left: isMobile ? '50px' : '60px',
+                      left: '50%',
+                      transform: 'translateX(-50%)',
                       marginTop: '6px',
-                      maxWidth: 'calc(100% - 80px)',
+                      maxWidth: 'calc(100% - 40px)',
                       padding: '6px 28px 6px 10px',
                       backgroundColor: '#0a0a0a',
                       border: '1px solid #00ff41',
@@ -1918,10 +1903,12 @@ const HabitTracker = () => {
                       >
                         ×
                       </button>
+                      {/* Speech bubble tail - centered */}
                       <div style={{
                         position: 'absolute',
                         top: '-5px',
-                        left: '16px',
+                        left: '50%',
+                        transform: 'translateX(-50%)',
                         width: 0,
                         height: 0,
                         borderLeft: '5px solid transparent',
@@ -1982,6 +1969,10 @@ const HabitTracker = () => {
             from { opacity: 0; transform: translateY(-4px); }
             to { opacity: 1; transform: translateY(0); }
           }
+          @keyframes hagotchiBounce {
+            0%, 100% { transform: translateY(0); }
+            50% { transform: translateY(-6px); }
+          }
         `}
       </style>
 
@@ -2006,297 +1997,417 @@ const HabitTracker = () => {
               marginBottom: '16px',
             }}
           >
-            {/* Top bar: Date + Coins + Menu */}
+            {/* Top bar: Coins | Hearts | Menu */}
             <div style={{
               display: 'flex',
               justifyContent: 'space-between',
               alignItems: 'center',
-              marginBottom: '12px',
+              marginBottom: '16px',
             }}>
-              <span style={{
-                fontSize: '10px',
-                color: '#666',
-                letterSpacing: '1px',
-                textTransform: 'uppercase',
-              }}>
-                {new Date().toLocaleDateString('en-US', { weekday: 'short', month: 'short', day: 'numeric' })}
-              </span>
-
-              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-                {/* Coins */}
-                <div style={{
-                  display: 'flex',
-                  alignItems: 'center',
-                  gap: '4px',
-                  padding: '4px 10px',
-                  backgroundColor: 'rgba(255, 170, 0, 0.08)',
-                  border: '1px solid rgba(255, 170, 0, 0.2)',
-                  borderRadius: '12px',
-                }}>
-                  <span style={{ fontSize: '11px', color: '#ffaa00' }}>●</span>
-                  <span style={{
-                    fontSize: '12px',
-                    color: '#ffaa00',
-                    fontWeight: 'bold',
-                    fontFamily: 'monospace',
-                  }}>
-                    {spirit.coins || 0}
-                  </span>
-                </div>
-
-                {/* Menu */}
-                <button
-                  onClick={(e) => {
-                    e.stopPropagation();
-                    setShowMobileMenu(true);
-                  }}
-                  style={{
-                    background: 'transparent',
-                    border: '1px solid #333',
-                    color: '#666',
-                    padding: '6px 10px',
-                    cursor: 'pointer',
-                    fontFamily: 'inherit',
-                    fontSize: '14px',
-                    lineHeight: 1,
-                    borderRadius: '4px',
-                  }}
-                >
-                  ⋮
-                </button>
-              </div>
-            </div>
-
-            {/* Large centered character - clickable for collection */}
-            <div
-              onClick={() => setShowSkinCollection(true)}
-              style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                position: 'relative',
-                cursor: 'pointer',
-                // Fixed min-height prevents layout shift when speech bubble is dismissed
-                minHeight: '280px',
-              }}
-            >
-              {/* Speech bubble above character - absolutely positioned to not affect layout */}
-              {encouragementMessage && (
-                <div style={{
-                  position: 'absolute',
-                  top: '0',
-                  left: '50%',
-                  transform: 'translateX(-50%)',
-                  maxWidth: '260px',
-                  zIndex: 10,
-                }}>
-                  <div style={{
-                    padding: '8px 28px 8px 12px',
-                    backgroundColor: 'rgba(0, 255, 65, 0.08)',
-                    border: '1px solid rgba(0, 255, 65, 0.4)',
-                    borderRadius: '8px',
-                    position: 'relative',
-                  }}>
-                    <p style={{
-                      fontSize: '11px',
-                      color: '#00ff41',
-                      margin: 0,
-                      lineHeight: 1.4,
-                      textAlign: 'center',
-                    }}>
-                      "{encouragementMessage}"
-                    </p>
-                    {/* Dismiss X */}
-                    <button
-                      onClick={(e) => {
-                        e.stopPropagation();
-                        clearEncouragement();
-                      }}
-                      style={{
-                        position: 'absolute',
-                        top: '4px',
-                        right: '4px',
-                        background: 'transparent',
-                        border: 'none',
-                        color: '#00ff41',
-                        fontSize: '14px',
-                        cursor: 'pointer',
-                        padding: '2px 6px',
-                        lineHeight: 1,
-                        opacity: 0.6,
-                      }}
-                    >
-                      ×
-                    </button>
-                  </div>
-                  {/* Speech bubble tail */}
-                  <div style={{
-                    position: 'absolute',
-                    bottom: '-6px',
-                    left: '50%',
-                    transform: 'translateX(-50%)',
-                    width: 0,
-                    height: 0,
-                    borderLeft: '6px solid transparent',
-                    borderRight: '6px solid transparent',
-                    borderTop: '6px solid rgba(0, 255, 65, 0.4)',
-                  }} />
-                </div>
-              )}
-
-              {/* Glow ring - fixed position, doesn't change with bubble */}
-              <div style={{
-                position: 'absolute',
-                top: '70px',
-                width: '140px',
-                height: '140px',
-                borderRadius: '50%',
-                background: getTotalHearts(completionPercent) >= 2.5
-                  ? 'radial-gradient(circle, rgba(0,255,65,0.25) 0%, transparent 70%)'
-                  : 'radial-gradient(circle, rgba(0,255,65,0.08) 0%, transparent 70%)',
-                animation: getTotalHearts(completionPercent) >= 2.5 ? 'headerGlow 2s ease-in-out infinite' : 'none',
-              }} />
-
-              {/* Character - positioned below speech bubble area */}
-              <img
-                src={currentSkin.image}
-                alt={currentSkin.name}
-                style={{
-                  width: '100px',
-                  height: '100px',
-                  imageRendering: 'pixelated',
-                  position: 'relative',
-                  zIndex: 1,
-                  marginTop: '70px',
-                  filter: getTotalHearts(completionPercent) >= 2.5
-                    ? 'drop-shadow(0 0 16px rgba(0,255,65,0.6))'
-                    : 'drop-shadow(0 0 8px rgba(0,255,65,0.3))',
-                  marginBottom: '12px',
-                }}
-              />
-
-              {/* Name + Rarity */}
+              {/* Left: Coins */}
               <div style={{
                 display: 'flex',
                 alignItems: 'center',
-                gap: '8px',
-                marginBottom: '16px',
+                gap: '4px',
+                padding: '4px 10px',
+                backgroundColor: 'rgba(255, 170, 0, 0.08)',
+                border: '1px solid rgba(255, 170, 0, 0.2)',
+                borderRadius: '12px',
               }}>
+                <span style={{ fontSize: '11px', color: '#ffaa00' }}>●</span>
                 <span style={{
-                  fontSize: '16px',
-                  color: '#fff',
-                  fontWeight: '600',
-                  letterSpacing: '1px',
+                  fontSize: '12px',
+                  color: '#ffaa00',
+                  fontWeight: 'bold',
+                  fontFamily: 'monospace',
                 }}>
-                  {currentSkin.name}
-                </span>
-                <span style={{
-                  fontSize: '9px',
-                  color: (() => {
-                    const colors = { common: '#888', uncommon: '#4ade80', rare: '#60a5fa', epic: '#c084fc', legendary: '#fbbf24' };
-                    return colors[currentSkin.rarity] || '#888';
-                  })(),
-                  textTransform: 'uppercase',
-                  letterSpacing: '0.5px',
-                  padding: '3px 6px',
-                  border: `1px solid ${(() => {
-                    const colors = { common: '#333', uncommon: '#4ade8040', rare: '#60a5fa40', epic: '#c084fc40', legendary: '#fbbf2440' };
-                    return colors[currentSkin.rarity] || '#333';
-                  })()}`,
-                  borderRadius: '4px',
-                }}>
-                  {currentSkin.rarity}
+                  {spirit.coins || 0}
                 </span>
               </div>
 
-              {/* Hearts - First heart emphasized as TODAY indicator */}
+              {/* Center: Hearts */}
               <div style={{
                 display: 'flex',
-                alignItems: 'flex-end',
-                gap: '6px',
-                marginBottom: '12px',
+                alignItems: 'center',
+                gap: '4px',
               }}>
                 {[0, 1, 2].map(i => {
                   const hearts = getTotalHearts(completionPercent);
                   const fill = Math.max(0, Math.min(1, hearts - i));
                   const isFull = fill >= 1;
                   const isEmpty = fill <= 0;
-                  const isToday = i === 0;
                   const isPartiallyFilled = fill > 0 && fill < 1;
 
                   return (
-                    <div key={i} style={{
-                      display: 'flex',
-                      flexDirection: 'column',
-                      alignItems: 'center',
-                      gap: '4px',
-                    }}>
-                      <svg
-                        viewBox="0 0 24 22"
+                    <svg
+                      key={i}
+                      viewBox="0 0 24 22"
+                      style={{
+                        width: '20px',
+                        height: '18px',
+                        filter: isFull
+                          ? 'drop-shadow(0 0 4px rgba(0, 255, 65, 0.6))'
+                          : isPartiallyFilled
+                            ? 'drop-shadow(0 0 3px rgba(0, 255, 65, 0.4))'
+                            : 'none',
+                        transition: 'filter 0.3s ease',
+                      }}
+                    >
+                      <path
+                        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                        fill="none"
+                        stroke={isEmpty ? '#333' : '#00ff41'}
+                        strokeWidth="1.5"
+                      />
+                      <path
+                        d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
+                        fill="#00ff41"
                         style={{
-                          width: isToday ? '44px' : '24px',
-                          height: isToday ? '40px' : '22px',
-                          filter: isToday && isPartiallyFilled
-                            ? 'drop-shadow(0 0 8px rgba(0, 255, 65, 0.5))'
-                            : isFull
-                              ? 'drop-shadow(0 0 6px rgba(0, 255, 65, 0.8))'
-                              : 'none',
-                          transition: 'filter 0.3s ease',
+                          clipPath: `inset(${(1 - fill) * 100}% 0 0 0)`,
                         }}
-                      >
-                        <path
-                          d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-                          fill="none"
-                          stroke={isEmpty ? '#333' : '#00ff41'}
-                          strokeWidth={isToday ? '1.2' : '1.5'}
-                        />
-                        <path
-                          d="M12 21.35l-1.45-1.32C5.4 15.36 2 12.28 2 8.5 2 5.42 4.42 3 7.5 3c1.74 0 3.41.81 4.5 2.09C13.09 3.81 14.76 3 16.5 3 19.58 3 22 5.42 22 8.5c0 3.78-3.4 6.86-8.55 11.54L12 21.35z"
-                          fill="#00ff41"
-                          style={{
-                            clipPath: `inset(${(1 - fill) * 100}% 0 0 0)`,
-                          }}
-                        />
-                      </svg>
-                      {isToday && (
-                        <span style={{
-                          fontSize: '8px',
-                          color: isPartiallyFilled ? '#00ff41' : '#555',
-                          textTransform: 'uppercase',
-                          letterSpacing: '1px',
-                          fontWeight: 'bold',
-                        }}>
-                          Today
-                        </span>
-                      )}
-                    </div>
+                      />
+                    </svg>
                   );
                 })}
               </div>
 
-              {/* Habit count and unlock progress */}
-              <div style={{
-                display: 'flex',
-                flexDirection: 'column',
-                alignItems: 'center',
-                gap: '4px',
-              }}>
-                <span style={{
+              {/* Right: Menu */}
+              <button
+                onClick={(e) => {
+                  e.stopPropagation();
+                  setShowMobileMenu(true);
+                }}
+                style={{
+                  background: 'transparent',
+                  border: '1px solid #333',
+                  color: '#666',
+                  padding: '6px 10px',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
                   fontSize: '14px',
-                  color: completionPercent === 100 ? '#00ff41' : '#fff',
-                  fontWeight: completionPercent === 100 ? 'bold' : 'normal',
+                  lineHeight: 1,
+                  borderRadius: '4px',
+                }}
+              >
+                ⋮
+              </button>
+            </div>
+
+            {/* CRT Device Frame */}
+            <div style={{
+              display: 'flex',
+              flexDirection: 'column',
+              alignItems: 'center',
+            }}>
+              {/* Device outer shell */}
+              <div style={{
+                backgroundColor: '#1a1a1a',
+                border: '2px solid #333',
+                borderRadius: '24px',
+                padding: '20px',
+                boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5), 0 4px 12px rgba(0,0,0,0.3)',
+              }}>
+                {/* HAGOTCHI label above screen */}
+                <div style={{
+                  textAlign: 'center',
+                  marginBottom: '12px',
                 }}>
-                  {completedCount}/{habitsForSelectedDate.length} {completionPercent === 100 ? '✓' : `(${completionPercent}%)`}
-                </span>
-                {getTotalHearts(completionPercent) >= 2.5 && (
                   <span style={{
-                    fontSize: '10px',
+                    fontSize: '14px',
                     color: '#00ff41',
-                    animation: 'headerPulse 1.5s ease-in-out infinite',
+                    letterSpacing: '3px',
+                    fontWeight: 'bold',
+                    textShadow: '0 0 10px rgba(0,255,65,0.3)',
                   }}>
-                    ★ New friend soon!
+                    HAGOTCHI
                   </span>
-                )}
+                </div>
+                {/* Screen bezel */}
+                <div style={{
+                  backgroundColor: '#0d0d0d',
+                  border: '3px solid #222',
+                  borderRadius: '12px',
+                  padding: '10px',
+                  position: 'relative',
+                  overflow: 'hidden',
+                }}>
+                  {/* CRT Screen */}
+                  <div
+                    onClick={() => setShowHagotchiMenu(true)}
+                    style={{
+                      width: '300px',
+                      height: '240px',
+                      backgroundColor: '#050505',
+                      borderRadius: '4px',
+                      position: 'relative',
+                      cursor: 'pointer',
+                      display: 'flex',
+                      flexDirection: 'column',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      overflow: 'hidden',
+                    }}
+                  >
+                    {/* CRT scanlines overlay */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.15) 0px, rgba(0,0,0,0.15) 1px, transparent 1px, transparent 2px)',
+                      pointerEvents: 'none',
+                      zIndex: 10,
+                    }} />
+
+                    {/* CRT screen glow */}
+                    <div style={{
+                      position: 'absolute',
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      boxShadow: 'inset 0 0 30px rgba(0,255,65,0.1)',
+                      borderRadius: '4px',
+                      pointerEvents: 'none',
+                      zIndex: 5,
+                    }} />
+
+                    {/* Speech bubble inside screen */}
+                    {encouragementMessage && (
+                      <div style={{
+                        position: 'absolute',
+                        top: '12px',
+                        left: '12px',
+                        right: '12px',
+                        padding: '8px 28px 8px 12px',
+                        backgroundColor: 'rgba(0, 255, 65, 0.1)',
+                        border: '1px solid rgba(0, 255, 65, 0.3)',
+                        borderRadius: '6px',
+                        zIndex: 8,
+                      }}>
+                        <p style={{
+                          fontSize: '12px',
+                          color: '#00ff41',
+                          margin: 0,
+                          lineHeight: 1.4,
+                          textAlign: 'center',
+                        }}>
+                          "{encouragementMessage}"
+                        </p>
+                        <button
+                          onClick={(e) => {
+                            e.stopPropagation();
+                            clearEncouragement();
+                          }}
+                          style={{
+                            position: 'absolute',
+                            top: '2px',
+                            right: '4px',
+                            background: 'transparent',
+                            border: 'none',
+                            color: '#00ff41',
+                            fontSize: '12px',
+                            cursor: 'pointer',
+                            padding: '2px',
+                            lineHeight: 1,
+                            opacity: 0.6,
+                          }}
+                        >
+                          ×
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Character with idle animation */}
+                    <img
+                      src={currentSkin.image}
+                      alt={currentSkin.name}
+                      style={{
+                        width: '112px',
+                        height: '112px',
+                        imageRendering: 'pixelated',
+                        position: 'relative',
+                        zIndex: 2,
+                        marginTop: encouragementMessage ? '20px' : '0',
+                        filter: getTotalHearts(completionPercent) >= 2.5
+                          ? 'drop-shadow(0 0 12px rgba(0,255,65,0.6))'
+                          : 'drop-shadow(0 0 6px rgba(0,255,65,0.3))',
+                        animation: 'hagotchiBounce 2s ease-in-out infinite',
+                      }}
+                    />
+
+                    {/* Name below character */}
+                    <div style={{
+                      position: 'absolute',
+                      bottom: '12px',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      zIndex: 3,
+                    }}>
+                      <span style={{
+                        fontSize: '14px',
+                        color: '#00ff41',
+                        fontWeight: '500',
+                        textShadow: '0 0 8px rgba(0,255,65,0.5)',
+                      }}>
+                        {currentSkin.name}
+                      </span>
+                      <span style={{
+                        fontSize: '9px',
+                        color: (() => {
+                          const colors = { common: '#666', uncommon: '#4ade80', rare: '#60a5fa', epic: '#c084fc', legendary: '#fbbf24' };
+                          return colors[currentSkin.rarity] || '#666';
+                        })(),
+                        textTransform: 'uppercase',
+                      }}>
+                        [{currentSkin.rarity}]
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* Control panel with buttons */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: '32px',
+                  marginTop: '20px',
+                  padding: '0 12px',
+                }}>
+                  {[
+                    { id: 'tell_joke', label: 'JOKE', icon: '◉' },
+                    { id: 'tell_encouragement', label: 'PEP', icon: '◉' },
+                    { id: 'lore', label: 'LORE', icon: '◉' },
+                  ].map(btn => (
+                    <button
+                      key={btn.id}
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        if (btn.id === 'lore') {
+                          setShowLoreArchive(true);
+                        } else {
+                          triggerInteraction(btn.id);
+                        }
+                      }}
+                      style={{
+                        display: 'flex',
+                        flexDirection: 'column',
+                        alignItems: 'center',
+                        gap: '4px',
+                        background: 'transparent',
+                        border: 'none',
+                        cursor: 'pointer',
+                        padding: '4px',
+                      }}
+                    >
+                      <div style={{
+                        width: '44px',
+                        height: '44px',
+                        borderRadius: '50%',
+                        backgroundColor: '#111',
+                        border: '2px solid #333',
+                        display: 'flex',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        boxShadow: 'inset 0 2px 4px rgba(0,0,0,0.5), 0 1px 2px rgba(0,0,0,0.3)',
+                        transition: 'all 0.1s ease',
+                      }}>
+                        <span style={{ color: '#00ff41', fontSize: '18px' }}>{btn.icon}</span>
+                      </div>
+                      <span style={{
+                        fontSize: '10px',
+                        color: '#555',
+                        letterSpacing: '0.5px',
+                        fontWeight: 'bold',
+                      }}>
+                        {btn.label}
+                      </span>
+                    </button>
+                  ))}
+                </div>
+
+                {/* Decorative speaker grille */}
+                <div style={{
+                  display: 'flex',
+                  justifyContent: 'center',
+                  gap: '3px',
+                  marginTop: '10px',
+                }}>
+                  {[...Array(8)].map((_, i) => (
+                    <div key={i} style={{
+                      width: '3px',
+                      height: '12px',
+                      backgroundColor: '#222',
+                      borderRadius: '1px',
+                    }} />
+                  ))}
+                </div>
+              </div>
+
+              {/* Cartridge sticking out the bottom - collection button */}
+              <div
+                onClick={() => setShowSkinCollection(true)}
+                style={{
+                  width: '200px',
+                  height: '32px',
+                  backgroundColor: '#252525',
+                  border: '2px solid #333',
+                  borderTop: 'none',
+                  borderRadius: '0 0 10px 10px',
+                  position: 'relative',
+                  display: 'flex',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  cursor: 'pointer',
+                  boxShadow: '0 4px 8px rgba(0,0,0,0.3)',
+                  transition: 'transform 0.1s ease',
+                }}
+              >
+                {/* Cartridge grip texture */}
+                <div style={{
+                  position: 'absolute',
+                  left: '12px',
+                  display: 'flex',
+                  gap: '2px',
+                }}>
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} style={{
+                      width: '2px',
+                      height: '16px',
+                      backgroundColor: '#333',
+                      borderRadius: '1px',
+                    }} />
+                  ))}
+                </div>
+
+                {/* Cartridge label */}
+                <span style={{
+                  fontSize: '10px',
+                  color: '#666',
+                  letterSpacing: '0.5px',
+                  fontWeight: 'bold',
+                }}>
+                  {spirit?.unlocked_skin_ids?.length || 1}/15 Collected
+                </span>
+
+                {/* Cartridge grip texture right */}
+                <div style={{
+                  position: 'absolute',
+                  right: '12px',
+                  display: 'flex',
+                  gap: '2px',
+                }}>
+                  {[...Array(3)].map((_, i) => (
+                    <div key={i} style={{
+                      width: '2px',
+                      height: '16px',
+                      backgroundColor: '#333',
+                      borderRadius: '1px',
+                    }} />
+                  ))}
+                </div>
               </div>
             </div>
           </div>
@@ -3241,13 +3352,11 @@ const HabitTracker = () => {
       </div>
         {/*
           Scroll spacer for mobile:
-          - Scroll threshold to show compact header: 280px
-          - This spacer must be large enough that: content_height - viewport_height > 280px
-          - Using 50vh (half viewport) ensures enough scroll room on any screen size
-          - Min 300px ensures it works on very short content too
+          - Just enough to allow scrolling past the hero to trigger compact header
+          - CRT device is large enough now, only need minimal extra space
         */}
         {isMobile && selectedView === 'today' && (
-          <div style={{ height: 'max(300px, 50vh)', flexShrink: 0 }} aria-hidden="true" />
+          <div style={{ height: '100px', flexShrink: 0 }} aria-hidden="true" />
         )}
       </div>
 
@@ -4061,6 +4170,107 @@ const HabitTracker = () => {
               }}
             >
               <span>⏻</span> Logout
+            </button>
+          </div>
+        </BottomSheet>
+
+        {/* Hagotchi Interaction Menu */}
+        <BottomSheet
+          isOpen={showHagotchiMenu}
+          onClose={() => setShowHagotchiMenu(false)}
+          title={currentSkin?.name ? `${currentSkin.name} says...` : 'HAGOTCHI'}
+          isMobile={isMobile}
+        >
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            gap: '8px',
+          }}>
+            {/* Interaction options */}
+            {[
+              { id: 'tell_joke', label: 'Tell me a joke', icon: '😄' },
+              { id: 'tell_fact', label: 'Share a fact', icon: '💡' },
+              { id: 'tell_encouragement', label: 'Encourage me', icon: '💪' },
+            ].map(option => (
+              <button
+                key={option.id}
+                onClick={() => {
+                  triggerInteraction(option.id);
+                  setShowHagotchiMenu(false);
+                }}
+                style={{
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: '12px',
+                  padding: '14px 16px',
+                  backgroundColor: 'rgba(0, 255, 65, 0.03)',
+                  border: '1px solid #333',
+                  color: '#fff',
+                  cursor: 'pointer',
+                  fontFamily: 'inherit',
+                  fontSize: '13px',
+                  textAlign: 'left',
+                  transition: 'all 0.15s ease',
+                }}
+              >
+                <span style={{ fontSize: '18px' }}>{option.icon}</span>
+                <span>{option.label}</span>
+              </button>
+            ))}
+
+            {/* Divider */}
+            <div style={{ height: '1px', backgroundColor: '#222', margin: '8px 0' }} />
+
+            {/* Lore option */}
+            <button
+              onClick={() => {
+                setShowHagotchiMenu(false);
+                setShowLoreArchive(true);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '14px 16px',
+                backgroundColor: 'transparent',
+                border: '1px solid #333',
+                color: '#888',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontSize: '13px',
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>📖</span>
+              <span>Who are you?</span>
+              <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#555' }}>View lore</span>
+            </button>
+
+            {/* See friends option */}
+            <button
+              onClick={() => {
+                setShowHagotchiMenu(false);
+                setShowSkinCollection(true);
+              }}
+              style={{
+                display: 'flex',
+                alignItems: 'center',
+                gap: '12px',
+                padding: '14px 16px',
+                backgroundColor: 'transparent',
+                border: '1px solid #333',
+                color: '#888',
+                cursor: 'pointer',
+                fontFamily: 'inherit',
+                fontSize: '13px',
+                textAlign: 'left',
+              }}
+            >
+              <span style={{ fontSize: '18px' }}>👥</span>
+              <span>See friends</span>
+              <span style={{ marginLeft: 'auto', fontSize: '10px', color: '#555' }}>
+                {spirit?.unlocked_skin_ids?.length || 1}/15 unlocked
+              </span>
             </button>
           </div>
         </BottomSheet>

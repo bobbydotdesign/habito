@@ -8,6 +8,7 @@ import {
 } from '../data/hagotchiSkins';
 import {
   getEncouragementMessage,
+  getInteractionMessage,
   getTimeOfDayTrigger,
   shouldShowWelcomeBack,
   getCompletionTrigger,
@@ -681,6 +682,16 @@ export const useHagotchi = (userId) => {
     setEncouragementMessage(null);
   }, []);
 
+  // Trigger an on-demand interaction (joke, fact, encouragement)
+  const triggerInteraction = useCallback((type) => {
+    if (!spirit) return;
+    const currentSkin = getSkinById(spirit.active_skin_id);
+    const message = getInteractionMessage(type, currentSkin.personality);
+    if (message) {
+      setEncouragementMessage(message);
+    }
+  }, [spirit]);
+
   // Get current skin data
   const currentSkin = spirit ? getSkinById(spirit.active_skin_id) : null;
 
@@ -724,9 +735,10 @@ export const useHagotchi = (userId) => {
     showUnlockAnimation,
     closeUnlockAnimation,
 
-    // Encouragement
+    // Encouragement & Interactions
     encouragementMessage,
     clearEncouragement,
+    triggerInteraction,
 
     // Utilities
     refetchSpirit: fetchSpirit,
