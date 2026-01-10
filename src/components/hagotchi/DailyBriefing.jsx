@@ -193,8 +193,6 @@ const DailyBriefing = ({
         backgroundColor: '#0a0a0a',
         fontFamily: '"IBM Plex Mono", "Fira Code", "SF Mono", monospace',
         color: '#00ff41',
-        display: 'flex',
-        flexDirection: 'column',
         zIndex: 9999,
         opacity: fadeIn ? 1 : 0,
         transition: 'opacity 0.5s ease-out',
@@ -297,105 +295,98 @@ const DailyBriefing = ({
         </div>
       )}
 
-      {/* TOP SECTION - Date & Weather (fixed to top) */}
+      {/* Content wrapper - simple vertical layout */}
       <div style={{
-        position: 'fixed',
-        top: 0,
-        left: 0,
-        right: 0,
+        position: 'relative',
+        width: '100%',
+        height: '100%',
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        paddingTop: '70px',
-        paddingBottom: '16px',
-        zIndex: 9999,
-        pointerEvents: 'none',
-      }}>
-        {/* Date */}
-        <div style={{
-          fontSize: isMobile ? '16px' : '14px',
-          letterSpacing: '1px',
-          color: '#fff',
-          marginBottom: '8px',
-          textAlign: 'center',
-        }}>
-          {formatDate()}
-        </div>
-
-        {/* Holiday badge (if it's a holiday) */}
-        {todayFact?.type === 'holiday' && (
-          <div style={{
-            fontSize: '11px',
-            letterSpacing: '1px',
-            color: '#ffaa00',
-            marginBottom: '8px',
-            padding: '4px 12px',
-            border: '1px solid #ffaa00',
-            textTransform: 'uppercase',
-          }}>
-            {todayFact.name}
-          </div>
-        )}
-
-        {/* Weather */}
-        {weather && !showLocationPrompt && (
-          <div style={{
-            display: 'flex',
-            alignItems: 'center',
-            gap: '8px',
-            fontSize: '13px',
-            color: '#888',
-          }}>
-            <span style={{ fontSize: '20px' }}>{weather.icon}</span>
-            <span>{weather.temp}°F</span>
-            <span style={{ color: '#666' }}>·</span>
-            <span>{weather.condition}</span>
-          </div>
-        )}
-      </div>
-
-      {/* MIDDLE SECTION - Hagotchi & Message (centered) */}
-      <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
-        bottom: 0,
-        display: 'flex',
-        flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '0 24px',
         zIndex: 2,
       }}>
-        {/* Speech Bubble Message (above Hagotchi) */}
+        {/* TOP: Date & Weather */}
         <div style={{
-          position: 'relative',
-          maxWidth: '320px',
-          marginBottom: '16px',
+          paddingTop: '70px',
+          paddingBottom: '16px',
+          textAlign: 'center',
         }}>
-          {/* Bubble content */}
           <div style={{
-            padding: isMobile ? '16px 20px' : '14px 18px',
-            backgroundColor: '#0a0a0a',
-            border: '1px solid #00ff41',
-            borderRadius: '12px',
-            boxShadow: '0 0 20px rgba(0, 255, 65, 0.15)',
+            fontSize: isMobile ? '16px' : '14px',
+            letterSpacing: '1px',
+            color: '#fff',
+            marginBottom: '8px',
           }}>
-            <p style={{
-              fontSize: isMobile ? '15px' : '13px',
-              color: '#00ff41',
-              margin: 0,
-              textAlign: 'center',
-              lineHeight: 1.5,
-              textShadow: '0 0 10px rgba(0, 255, 65, 0.3)',
-            }}>
-              "{message}"
-            </p>
+            {formatDate()}
           </div>
-          {/* Bubble pointer (pointing down toward Hagotchi) */}
-          <div
-            style={{
+
+          {todayFact?.type === 'holiday' && (
+            <div style={{
+              fontSize: '11px',
+              letterSpacing: '1px',
+              color: '#ffaa00',
+              marginBottom: '8px',
+              padding: '4px 12px',
+              border: '1px solid #ffaa00',
+              textTransform: 'uppercase',
+              display: 'inline-block',
+            }}>
+              {todayFact.name}
+            </div>
+          )}
+
+          {weather && !showLocationPrompt && (
+            <div style={{
+              display: 'flex',
+              alignItems: 'center',
+              justifyContent: 'center',
+              gap: '8px',
+              fontSize: '13px',
+              color: '#888',
+            }}>
+              <span style={{ fontSize: '20px' }}>{weather.icon}</span>
+              <span>{weather.temp}°F</span>
+              <span style={{ color: '#666' }}>·</span>
+              <span>{weather.condition}</span>
+            </div>
+          )}
+        </div>
+
+        {/* SPACER */}
+        <div style={{ flex: 1 }} />
+
+        {/* MIDDLE: Hagotchi & Message */}
+        <div style={{
+          display: 'flex',
+          flexDirection: 'column',
+          alignItems: 'center',
+          padding: '0 24px',
+        }}>
+          {/* Speech Bubble */}
+          <div style={{
+            position: 'relative',
+            maxWidth: '320px',
+            marginBottom: '16px',
+          }}>
+            <div style={{
+              padding: isMobile ? '16px 20px' : '14px 18px',
+              backgroundColor: '#0a0a0a',
+              border: '1px solid #00ff41',
+              borderRadius: '12px',
+              boxShadow: '0 0 20px rgba(0, 255, 65, 0.15)',
+            }}>
+              <p style={{
+                fontSize: isMobile ? '15px' : '13px',
+                color: '#00ff41',
+                margin: 0,
+                textAlign: 'center',
+                lineHeight: 1.5,
+                textShadow: '0 0 10px rgba(0, 255, 65, 0.3)',
+              }}>
+                "{message}"
+              </p>
+            </div>
+            <div style={{
               position: 'absolute',
               bottom: '-8px',
               left: '50%',
@@ -405,129 +396,104 @@ const DailyBriefing = ({
               borderLeft: '8px solid transparent',
               borderRight: '8px solid transparent',
               borderTop: '8px solid #00ff41',
-            }}
-          />
-        </div>
+            }} />
+          </div>
 
-        {/* Hagotchi Character */}
-        <div
-          style={{
-            position: 'relative',
-            transform: `translateY(${-bounceOffset}px) translateZ(0)`,
-            WebkitTransform: `translateY(${-bounceOffset}px) translateZ(0)`,
-            transition: 'transform 0.3s ease',
-            WebkitBackfaceVisibility: 'hidden',
-            backfaceVisibility: 'hidden',
+          {/* Hagotchi */}
+          <div style={{
+            transform: `translateY(${-bounceOffset}px)`,
             marginBottom: '12px',
-          }}
-        >
-          <img
-            src={skin.image}
-            alt={skin.name}
-            style={{
-              width: isMobile ? '120px' : '100px',
-              height: isMobile ? '120px' : '100px',
-              imageRendering: 'pixelated',
-              WebkitBackfaceVisibility: 'hidden',
-              backfaceVisibility: 'hidden',
-            }}
-          />
-        </div>
-
-        {/* Character Name */}
-        <div style={{
-          display: 'flex',
-          alignItems: 'center',
-          gap: '8px',
-        }}>
-          <span style={{
-            fontSize: isMobile ? '12px' : '11px',
-            color: '#666',
-            letterSpacing: '1px',
-            textTransform: 'uppercase',
           }}>
-            {skin.name}
-          </span>
-          <span style={{
-            fontSize: '9px',
-            color: getRarityColor(skin.rarity),
-            textTransform: 'uppercase',
+            <img
+              src={skin.image}
+              alt={skin.name}
+              style={{
+                width: isMobile ? '120px' : '100px',
+                height: isMobile ? '120px' : '100px',
+                imageRendering: 'pixelated',
+              }}
+            />
+          </div>
+
+          {/* Name */}
+          <div style={{
+            display: 'flex',
+            alignItems: 'center',
+            gap: '8px',
           }}>
-            [{skin.rarity}]
-          </span>
-        </div>
-      </div>
-
-      {/* BOTTOM SECTION - Fact & Button (fixed to bottom) */}
-      {!showLocationPrompt && (
-        <div style={{
-          position: 'fixed',
-          bottom: 0,
-          left: 0,
-          right: 0,
-          display: 'flex',
-          flexDirection: 'column',
-          alignItems: 'center',
-          paddingTop: '16px',
-          paddingBottom: '50px',
-          zIndex: 9999,
-        }}>
-          {/* Fun Fact Section */}
-          {todayFact && (
-            <div style={{
-              maxWidth: '340px',
-              textAlign: 'center',
-              padding: '0 24px',
-              marginBottom: '24px',
-            }}>
-              <div style={{
-                fontSize: '11px',
-                color: todayFact.type === 'holiday' ? '#ffaa00' : '#888',
-                letterSpacing: '1px',
-                textTransform: 'uppercase',
-                marginBottom: '8px',
-              }}>
-                {todayFact.type === 'holiday' ? `Today: ${todayFact.name}` : 'Did You Know?'}
-              </div>
-              <div style={{
-                fontSize: '13px',
-                color: '#666',
-                lineHeight: 1.5,
-              }}>
-                {todayFact.fact}
-              </div>
-            </div>
-          )}
-
-          {/* Begin My Day Button */}
-          <button
-            onClick={handleBeginDay}
-            style={{
-              padding: '14px 32px',
-              backgroundColor: 'rgba(0, 255, 65, 0.1)',
-              border: '2px solid #00ff41',
-              color: '#00ff41',
-              fontFamily: 'inherit',
-              fontSize: '14px',
-              fontWeight: 'bold',
+            <span style={{
+              fontSize: isMobile ? '12px' : '11px',
+              color: '#666',
               letterSpacing: '1px',
-              cursor: 'pointer',
               textTransform: 'uppercase',
-              transition: 'all 0.2s ease',
-            }}
-            onMouseEnter={(e) => {
-              e.target.style.backgroundColor = 'rgba(0, 255, 65, 0.2)';
-              e.target.style.boxShadow = '0 0 20px rgba(0, 255, 65, 0.3)';
-            }}
-            onMouseLeave={(e) => {
-              e.target.style.backgroundColor = 'rgba(0, 255, 65, 0.1)';
-              e.target.style.boxShadow = 'none';
-            }}
-          >
-            Begin My Day
-          </button>
+            }}>
+              {skin.name}
+            </span>
+            <span style={{
+              fontSize: '9px',
+              color: getRarityColor(skin.rarity),
+              textTransform: 'uppercase',
+            }}>
+              [{skin.rarity}]
+            </span>
+          </div>
         </div>
-      )}
+
+        {/* SPACER */}
+        <div style={{ flex: 1 }} />
+
+        {/* BOTTOM: Fact & Button */}
+        {!showLocationPrompt && (
+          <div style={{
+            paddingTop: '16px',
+            paddingBottom: '50px',
+            textAlign: 'center',
+          }}>
+            {todayFact && (
+              <div style={{
+                maxWidth: '340px',
+                padding: '0 24px',
+                marginBottom: '24px',
+              }}>
+                <div style={{
+                  fontSize: '11px',
+                  color: todayFact.type === 'holiday' ? '#ffaa00' : '#888',
+                  letterSpacing: '1px',
+                  textTransform: 'uppercase',
+                  marginBottom: '8px',
+                }}>
+                  {todayFact.type === 'holiday' ? `Today: ${todayFact.name}` : 'Did You Know?'}
+                </div>
+                <div style={{
+                  fontSize: '13px',
+                  color: '#666',
+                  lineHeight: 1.5,
+                }}>
+                  {todayFact.fact}
+                </div>
+              </div>
+            )}
+
+            <button
+              onClick={handleBeginDay}
+              style={{
+                padding: '14px 32px',
+                backgroundColor: 'rgba(0, 255, 65, 0.1)',
+                border: '2px solid #00ff41',
+                color: '#00ff41',
+                fontFamily: 'inherit',
+                fontSize: '14px',
+                fontWeight: 'bold',
+                letterSpacing: '1px',
+                cursor: 'pointer',
+                textTransform: 'uppercase',
+              }}
+            >
+              Begin My Day
+            </button>
+          </div>
+        )}
+      </div>
     </div>
   );
 };
