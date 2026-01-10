@@ -297,15 +297,18 @@ const DailyBriefing = ({
         </div>
       )}
 
-      {/* TOP SECTION - Date & Weather */}
+      {/* TOP SECTION - Date & Weather (fixed to top) */}
       <div style={{
-        flexShrink: 0,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        paddingTop: `calc(48px + env(safe-area-inset-top, 0px))`,
+        paddingTop: `calc(60px + env(safe-area-inset-top, 0px))`,
         paddingBottom: '16px',
-        zIndex: 2,
+        zIndex: 10,
       }}>
         {/* Date */}
         <div style={{
@@ -352,7 +355,11 @@ const DailyBriefing = ({
 
       {/* MIDDLE SECTION - Hagotchi & Message (centered) */}
       <div style={{
-        flexGrow: 1,
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
@@ -405,8 +412,11 @@ const DailyBriefing = ({
         <div
           style={{
             position: 'relative',
-            transform: `translateY(${-bounceOffset}px)`,
+            transform: `translateY(${-bounceOffset}px) translateZ(0)`,
+            WebkitTransform: `translateY(${-bounceOffset}px) translateZ(0)`,
             transition: 'transform 0.3s ease',
+            WebkitBackfaceVisibility: 'hidden',
+            backfaceVisibility: 'hidden',
             marginBottom: '12px',
           }}
         >
@@ -417,6 +427,8 @@ const DailyBriefing = ({
               width: isMobile ? '120px' : '100px',
               height: isMobile ? '120px' : '100px',
               imageRendering: 'pixelated',
+              WebkitBackfaceVisibility: 'hidden',
+              backfaceVisibility: 'hidden',
             }}
           />
         </div>
@@ -445,16 +457,19 @@ const DailyBriefing = ({
         </div>
       </div>
 
-      {/* BOTTOM SECTION - Fact & Button */}
+      {/* BOTTOM SECTION - Fact & Button (fixed to bottom) */}
       {!showLocationPrompt && (
         <div style={{
-          flexShrink: 0,
+          position: 'absolute',
+          bottom: 0,
+          left: 0,
+          right: 0,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
           paddingTop: '16px',
-          paddingBottom: `calc(32px + env(safe-area-inset-bottom, 0px))`,
-          zIndex: 2,
+          paddingBottom: `calc(40px + env(safe-area-inset-bottom, 0px))`,
+          zIndex: 10,
         }}>
           {/* Fun Fact Section */}
           {todayFact && (
