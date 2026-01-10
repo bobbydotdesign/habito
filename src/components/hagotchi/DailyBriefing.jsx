@@ -297,10 +297,14 @@ const DailyBriefing = ({
 
       {/* Content wrapper - simple vertical layout */}
       <div style={{
-        position: 'relative',
-        width: '100%',
-        height: '100%',
+        position: 'absolute',
+        top: 0,
+        left: 0,
+        right: 0,
+        bottom: 0,
         display: 'flex',
+        WebkitBoxOrient: 'vertical',
+        WebkitBoxDirection: 'normal',
         flexDirection: 'column',
         alignItems: 'center',
         zIndex: 2,
@@ -310,6 +314,7 @@ const DailyBriefing = ({
           paddingTop: '70px',
           paddingBottom: '16px',
           textAlign: 'center',
+          background: 'rgba(255,0,0,0.3)',
         }}>
           <div style={{
             fontSize: isMobile ? '16px' : '14px',
