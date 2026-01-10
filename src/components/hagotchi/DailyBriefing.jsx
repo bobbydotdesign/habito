@@ -195,11 +195,6 @@ const DailyBriefing = ({
         color: '#00ff41',
         display: 'flex',
         flexDirection: 'column',
-        alignItems: 'center',
-        justifyContent: 'center',
-        padding: '40px 24px',
-        paddingTop: `calc(40px + env(safe-area-inset-top, 0px))`,
-        paddingBottom: `calc(40px + env(safe-area-inset-bottom, 0px))`,
         zIndex: 9999,
         opacity: fadeIn ? 1 : 0,
         transition: 'opacity 0.5s ease-out',
@@ -215,6 +210,7 @@ const DailyBriefing = ({
         bottom: 0,
         background: 'repeating-linear-gradient(0deg, rgba(0,0,0,0.1) 0px, rgba(0,0,0,0.1) 1px, transparent 1px, transparent 2px)',
         pointerEvents: 'none',
+        zIndex: 1,
       }} />
 
       {/* Vignette */}
@@ -226,6 +222,7 @@ const DailyBriefing = ({
         bottom: 0,
         background: 'radial-gradient(ellipse at center, transparent 0%, rgba(0,0,0,0.4) 100%)',
         pointerEvents: 'none',
+        zIndex: 1,
       }} />
 
       {/* Location Permission Prompt */}
@@ -244,7 +241,7 @@ const DailyBriefing = ({
             alignItems: 'center',
             justifyContent: 'center',
             padding: '24px',
-            zIndex: 10,
+            zIndex: 20,
           }}
         >
           <div style={{ maxWidth: '320px', textAlign: 'center' }}>
@@ -300,19 +297,15 @@ const DailyBriefing = ({
         </div>
       )}
 
-      {/* Top Section - Fixed to top */}
+      {/* TOP SECTION - Date & Weather */}
       <div style={{
-        position: 'absolute',
-        top: 0,
-        left: 0,
-        right: 0,
+        flexShrink: 0,
         display: 'flex',
         flexDirection: 'column',
         alignItems: 'center',
-        paddingTop: `calc(40px + env(safe-area-inset-top, 0px))`,
-        background: 'linear-gradient(to bottom, #0a0a0a 0%, #0a0a0a 80%, transparent 100%)',
-        paddingBottom: '24px',
-        zIndex: 5,
+        paddingTop: `calc(48px + env(safe-area-inset-top, 0px))`,
+        paddingBottom: '16px',
+        zIndex: 2,
       }}>
         {/* Date */}
         <div style={{
@@ -357,120 +350,111 @@ const DailyBriefing = ({
         )}
       </div>
 
-      {/* Speech Bubble Message (above Hagotchi) */}
+      {/* MIDDLE SECTION - Hagotchi & Message (centered) */}
       <div style={{
-        position: 'relative',
-        maxWidth: '320px',
-        marginBottom: '16px',
+        flexGrow: 1,
+        display: 'flex',
+        flexDirection: 'column',
+        alignItems: 'center',
+        justifyContent: 'center',
+        padding: '0 24px',
+        zIndex: 2,
       }}>
-        {/* Bubble content */}
+        {/* Speech Bubble Message (above Hagotchi) */}
         <div style={{
-          padding: isMobile ? '16px 20px' : '14px 18px',
-          backgroundColor: '#0a0a0a',
-          border: '1px solid #00ff41',
-          borderRadius: '12px',
-          boxShadow: '0 0 20px rgba(0, 255, 65, 0.15)',
-        }}>
-          <p style={{
-            fontSize: isMobile ? '15px' : '13px',
-            color: '#00ff41',
-            margin: 0,
-            textAlign: 'center',
-            lineHeight: 1.5,
-            textShadow: '0 0 10px rgba(0, 255, 65, 0.3)',
-          }}>
-            "{message}"
-          </p>
-        </div>
-        {/* Bubble pointer (pointing down toward Hagotchi) */}
-        <div
-          style={{
-            position: 'absolute',
-            bottom: '-8px',
-            left: '50%',
-            transform: 'translateX(-50%)',
-            width: 0,
-            height: 0,
-            borderLeft: '8px solid transparent',
-            borderRight: '8px solid transparent',
-            borderTop: '8px solid #00ff41',
-          }}
-        />
-      </div>
-
-      {/* Hagotchi Character */}
-      <div
-        style={{
           position: 'relative',
-          transform: `translateY(${-bounceOffset}px)`,
-          transition: 'transform 0.3s ease',
-          marginBottom: '12px',
-        }}
-      >
-        {/* Glow effect behind the character */}
+          maxWidth: '320px',
+          marginBottom: '16px',
+        }}>
+          {/* Bubble content */}
+          <div style={{
+            padding: isMobile ? '16px 20px' : '14px 18px',
+            backgroundColor: '#0a0a0a',
+            border: '1px solid #00ff41',
+            borderRadius: '12px',
+            boxShadow: '0 0 20px rgba(0, 255, 65, 0.15)',
+          }}>
+            <p style={{
+              fontSize: isMobile ? '15px' : '13px',
+              color: '#00ff41',
+              margin: 0,
+              textAlign: 'center',
+              lineHeight: 1.5,
+              textShadow: '0 0 10px rgba(0, 255, 65, 0.3)',
+            }}>
+              "{message}"
+            </p>
+          </div>
+          {/* Bubble pointer (pointing down toward Hagotchi) */}
+          <div
+            style={{
+              position: 'absolute',
+              bottom: '-8px',
+              left: '50%',
+              transform: 'translateX(-50%)',
+              width: 0,
+              height: 0,
+              borderLeft: '8px solid transparent',
+              borderRight: '8px solid transparent',
+              borderTop: '8px solid #00ff41',
+            }}
+          />
+        </div>
+
+        {/* Hagotchi Character */}
         <div
-          style={{
-            position: 'absolute',
-            top: '50%',
-            left: '50%',
-            transform: 'translate(-50%, -50%)',
-            width: isMobile ? '100px' : '80px',
-            height: isMobile ? '100px' : '80px',
-            borderRadius: '50%',
-            background: 'radial-gradient(circle, rgba(0, 255, 65, 0.4) 0%, transparent 70%)',
-            pointerEvents: 'none',
-          }}
-        />
-        <img
-          src={skin.image}
-          alt={skin.name}
           style={{
             position: 'relative',
-            width: isMobile ? '120px' : '100px',
-            height: isMobile ? '120px' : '100px',
-            imageRendering: 'pixelated',
+            transform: `translateY(${-bounceOffset}px)`,
+            transition: 'transform 0.3s ease',
+            marginBottom: '12px',
           }}
-        />
+        >
+          <img
+            src={skin.image}
+            alt={skin.name}
+            style={{
+              width: isMobile ? '120px' : '100px',
+              height: isMobile ? '120px' : '100px',
+              imageRendering: 'pixelated',
+            }}
+          />
+        </div>
+
+        {/* Character Name */}
+        <div style={{
+          display: 'flex',
+          alignItems: 'center',
+          gap: '8px',
+        }}>
+          <span style={{
+            fontSize: isMobile ? '12px' : '11px',
+            color: '#666',
+            letterSpacing: '1px',
+            textTransform: 'uppercase',
+          }}>
+            {skin.name}
+          </span>
+          <span style={{
+            fontSize: '9px',
+            color: getRarityColor(skin.rarity),
+            textTransform: 'uppercase',
+          }}>
+            [{skin.rarity}]
+          </span>
+        </div>
       </div>
 
-      {/* Character Name */}
-      <div style={{
-        display: 'flex',
-        alignItems: 'center',
-        gap: '8px',
-        marginBottom: '28px',
-      }}>
-        <span style={{
-          fontSize: isMobile ? '12px' : '11px',
-          color: '#666',
-          letterSpacing: '1px',
-          textTransform: 'uppercase',
-        }}>
-          {skin.name}
-        </span>
-        <span style={{
-          fontSize: '9px',
-          color: getRarityColor(skin.rarity),
-          textTransform: 'uppercase',
-        }}>
-          [{skin.rarity}]
-        </span>
-      </div>
-
-      {/* Bottom Section - Fixed to bottom */}
+      {/* BOTTOM SECTION - Fact & Button */}
       {!showLocationPrompt && (
         <div style={{
-          position: 'absolute',
-          bottom: 0,
-          left: 0,
-          right: 0,
+          flexShrink: 0,
           display: 'flex',
           flexDirection: 'column',
           alignItems: 'center',
-          paddingBottom: `calc(24px + env(safe-area-inset-bottom, 0px))`,
-          background: 'linear-gradient(to top, #0a0a0a 0%, #0a0a0a 80%, transparent 100%)',
-          paddingTop: '24px',
-          zIndex: 5,
+          paddingTop: '16px',
+          paddingBottom: `calc(32px + env(safe-area-inset-bottom, 0px))`,
+          zIndex: 2,
         }}>
           {/* Fun Fact Section */}
           {todayFact && (
@@ -528,16 +512,6 @@ const DailyBriefing = ({
           </button>
         </div>
       )}
-
-      {/* CSS Animations */}
-      <style>
-        {`
-          @keyframes pulse {
-            0%, 100% { opacity: 0.4; }
-            50% { opacity: 1; }
-          }
-        `}
-      </style>
     </div>
   );
 };
