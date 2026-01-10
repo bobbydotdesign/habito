@@ -70,6 +70,13 @@ Streaks are calculated from the `completions` table, NOT the `habits.streak` fie
 - Uses Capacitor 6.x to wrap the React web app
 - iOS project in `ios/App/`
 
+### iOS Build Workflow
+**Critical**: Always run `npm run build:ios` before building in Xcode. This:
+1. Builds the Vite web app (`npm run build`)
+2. Syncs assets to iOS project (`cap sync ios`)
+
+Without this step, Xcode uses stale cached web files and changes won't appear. If testing on iOS and changes don't show up, this is almost always the cause.
+
 ### Safe Area Handling
 **Critical**: iOS safe areas (Dynamic Island, notch) require careful handling:
 - `capacitor.config.json` has `contentInset: "automatic"` which handles some safe area adjustments
